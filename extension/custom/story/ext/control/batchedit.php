@@ -60,6 +60,12 @@ class myStory extends story
 
         if($this->post->titles)
         {
+            foreach($_POST['storyIdList'] as $storyID)
+            {
+                $result = $this->story->taskEstimateIsExceed($storyID, $_POST['estimates'][$storyID]);
+                if(!$result) return print(js::error($this->lang->story->taskEstimateExceedError));
+            }
+
             $allChanges = $this->story->batchUpdate();
 
             if($allChanges)
@@ -73,6 +79,8 @@ class myStory extends story
                 }
             }
 
+            if($storyType == 'story') $this->story->changeRequirementStatusByStoryStage($_POST['storyIdList']);
+
             $link = $this->app->tab == 'chteam' ? $this->session->teamStoryList : $this->session->storyList;
             return print(js::locate($link, 'parent'));
         }
@@ -83,6 +91,32 @@ class myStory extends story
 
         /* Get edited stories. */
         $stories = $this->story->getByList($storyIdList);
+
+        $noEditStory = '';
+        foreach($stories as $storyKey => $story)
+        {
+            $projectIdList     = $this->dao->select('project')->from('zt_projectstory')->where('story')->eq($storyKey)->fetchAll();
+            $isNotCloseProject = true;
+
+            foreach($projectIdList as $projectID)
+            {
+                $projectapprovalID = $this->dao->select('instance')->from('zt_project')->where('id')->eq($projectID->project)->fetch();
+
+                if(empty($projectapprovalID->instance)) continue;
+                $projectapproval = $this->dao->select('status')->from('zt_flow_projectapproval')->where('id')->eq($projectapprovalID->instance)->fetch();
+
+                if($projectapproval->status == 'cancelled' || $projectapproval->status == 'finished') $isNotCloseProject = false;
+            }
+
+            if(!$isNotCloseProject)
+            {
+                $noEditStory .= "#$storyKey ";
+                unset($stories[$storyKey]);
+            }
+        }
+
+        if(!empty($noEditStory)) echo js::alert(sprintf($this->lang->story->batchEditProjectapprovalTip, $noEditStory));
+        if(empty($stories)) return print(js::locate($this->session->storyList));
 
         /* Filter twins. */
         $twins = '';
@@ -188,7 +222,7 @@ class myStory extends story
             }
             else
             {
-                $moduleList[$story->id] = $modules[$story->product][0] + $this->tree->getModulesName($story->module);
+                $moduleList[$story->id] = $modules[$story->product][0] ? $modules[$story->product][0] : array() + $this->tree->getModulesName($story->module);
             }
 
             if($story->status == 'closed')

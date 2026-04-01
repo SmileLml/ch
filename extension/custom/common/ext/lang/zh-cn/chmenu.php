@@ -14,12 +14,12 @@ $lang->chteam->menu = new stdclass();
 $lang->chteam->menu->task   = array('link' => "{$lang->task->common}|chproject|task|project=%s", 'subModule' => 'task');
 $lang->chteam->menu->story  = array('link' => "{$lang->SRCommon}|chproject|story|project=%s", 'subModule' => 'story', 'alias' => 'storykanban,linkstory');
 $lang->chteam->menu->burn   = array('link' => "{$lang->chproject->burn}|chproject|burn|project=%s", 'subModule' => 'burn');
-$lang->chteam->menu->qa     = array('link' => "{$lang->qa->common}|chproject|bug|project=%s", 'subModule' => 'bug,testtask,testcase,testreport', 'alias' => 'bug,testtask,testcase,testreport');
+$lang->chteam->menu->qa     = array('link' => "{$lang->qa->common}|chproject|bug|project=%s&intanceProjectID=0&productID=0&branch=all&orderBy=&build=&type=bysearch&param=myQueryID", 'subModule' => 'bug,testtask,testcase,testreport', 'alias' => 'bug,testtask,testcase,testreport');
 $lang->chteam->menu->kanban = array('link' => "{$lang->kanban->common}|chproject|kanban|project=%s", 'alias' => 'cfd');
 $lang->chteam->menu->view   = array('link' => "{$lang->executionview->common}|chproject|gantt|project=%s", 'subModule' => 'execution', 'alias' => 'grouptask,gantt,taskeffort,tree');
 
 $lang->chteam->menu->qa['subMenu'] = new stdclass();
-$lang->chteam->menu->qa['subMenu']->bug        = array('link' => "{$lang->bug->common}|chproject|bug|project=%s", 'subModule' => 'bug');
+$lang->chteam->menu->qa['subMenu']->bug        = array('link' => "{$lang->bug->common}|chproject|bug|project=%s&intanceProjectID=0&productID=0&branch=all&orderBy=&build=&type=bysearch&param=myQueryID", 'subModule' => 'bug');
 $lang->chteam->menu->qa['subMenu']->testcase   = array('link' => "{$lang->testcase->shortCommon}|chproject|testcase|project=%s", 'subModule' => 'testcase');
 $lang->chteam->menu->qa['subMenu']->testtask   = array('link' => "{$lang->testtask->common}|chproject|testtask|project=%s", 'subModule' => 'testtask');
 $lang->chteam->menu->qa['subMenu']->testreport = array('link' => "{$lang->testreport->common}|chproject|testreport|project=%s", 'subModule' => 'testreport');

@@ -274,6 +274,16 @@ class myfile extends file
         $this->wordContent .= '</w:p>';
         $this->wordContent .= '</w:tc></w:tr>';
 
+        $this->wordContent .= '<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="DAEEF3" w:themeFill="accent5" w:themeFillTint="33"/><w:vAlign w:val="center"/></w:tcPr>';
+        $this->wordContent .= '<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="right"/></w:pPr>';
+        $this->wordContent .= '<w:r><w:rPr><w:color w:val="404040" w:themeColor="text1" w:themeTint="BF"/></w:rPr><w:t><![CDATA[' . $this->lang->story->residueEstimate . ']]></w:t></w:r></w:p></w:tc>';
+        $this->wordContent .= '<w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr>';
+
+        $this->wordContent .= '<w:p><w:pPr><w:ind w:leftChars="50" w:left="100"/><w:spacing w:after="0"/><w:rPr><w:rFonts w:hint="eastAsia"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr></w:pPr>';
+        $this->pauseHtmlTag($content->residueEstimate);
+        $this->wordContent .= '</w:p>';
+        $this->wordContent .= '</w:tc></w:tr>';
+
         if($this->config->vision == 'rnd')
         {
             $this->wordContent .= '<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="DAEEF3" w:themeFill="accent5" w:themeFillTint="33"/><w:vAlign w:val="center"/></w:tcPr>';

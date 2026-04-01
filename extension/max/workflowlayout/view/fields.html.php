@@ -54,19 +54,18 @@ if($flow->approval == 'enabled') $requiredFields = array_merge($requiredFields, 
     <?php if(($action->method !== 'browse' && strpos($action->method, 'batch') === false) && !$widthDisabled):?>
     <?php $widthDisabled = in_array($field->control, array('decimal','integer','formula','file','input','date','datetime')) ? '' : "readonly";?>
     <?php endif;?>
-    <td class='w-140px'>
-      <div class='input-group'>
-        <span class='input-group-addon text-muted'><?php echo $lang->workflowlayout->width;?></span>
-        <?php echo html::input("width[$key]", $field->width, "id='width{$key}' class='form-control' $widthDisabled");?>
-      </div>
-    </td>
+    <td class='w-140px'><?php echo html::input("width[$key]", $field->width, "id='width{$key}' class='form-control' $widthDisabled");?></td>
+    <?php if($action->method !== 'browse' && $action->buildin == 0):?>
+    <td class='w-140px'><?php echo html::input("colspan[$key]", $field->colspan, "id='colspan{$key}' class='form-control'");?></td>
+    <td class='w-140px'><?php echo html::input("titleWidth[$key]", $field->titleWidth, "id='titleWidth{$key}' class='form-control' $widthDisabled");?></td>
+    <td class='w-140px'><?php echo html::input("titleColspan[$key]", $field->titleColspan, "id='titleColspan{$key}' class='form-control'");?></td>
+    <?php endif;?>
     <?php endif;?>
 
     <?php if($action->method != 'browse' && $action->method != 'view' && !is_numeric($key)):?>
     <?php /* Layout rules. */ ?>
     <td class='w-160px'>
       <div class='input-group'>
-        <span class='text-muted input-group-addon'><?php echo $lang->workflowlayout->layoutRules;?></span>
         <?php if($subTable):?>
         <?php echo html::select("layoutRules[$key][]", $rules, '', "class='form-control chosen' multiple='multiple' disabled");?>
         <?php else:?>
@@ -79,7 +78,6 @@ if($flow->approval == 'enabled') $requiredFields = array_merge($requiredFields, 
     <?php /* Default value. */ ?>
     <td class='w-240px'>
       <div class='input-group'>
-        <span class='text-muted input-group-addon'><?php echo $lang->workflowlayout->defaultValue;?></span>
         <?php
         $data = "data-module='{$flow->module}' data-field='{$field->field}'";
         if($field->control == 'multi-select' or $field->control == 'checkbox')
@@ -90,7 +88,6 @@ if($flow->approval == 'enabled') $requiredFields = array_merge($requiredFields, 
         {
             echo html::select("defaultValue[$key]", array('' => '') + $field->options, $field->defaultValue, "id='defaultValue{$key}' class='form-control picker-select' $data $disabled");
         }
-        echo "<span class='input-group-addon fix-border'></span>";
         if(in_array($field->control, $dateControlList))
         {
             $class = 'form-' . $field->control;

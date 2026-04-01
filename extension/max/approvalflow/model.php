@@ -31,7 +31,6 @@ class approvalflowModel extends model
     {
         $flow = $this->dao->select('*')->from(TABLE_APPROVALFLOW)->where('id')->eq($flowID)->fetch();
         if(!$flow) return false;
-
         $spec = $this->dao->select('*')->from(TABLE_APPROVALFLOWSPEC)
             ->where('flow')->eq($flow->id)
             ->andWhere('version')->eq($version == 0 ? $flow->version : $version)
@@ -189,6 +188,14 @@ class approvalflowModel extends model
                         {
                             $node->reviewers[$index]->users = $upLevel ? array($upLevel) : array();
                         }
+                        else if($reviewer->type == 'groupMember')
+                        {
+                            $node->reviewers[$index]->users = isset($reviewers) ? $reviewers[$node->id]['reviewers'] : array();
+                        }
+                        else if($reviewer->type == 'permissionGrouping')
+                        {
+                            $node->reviewers[$index]->users = isset($reviewers) ? $reviewers[$node->id]['reviewers'] : array();
+                        }
 
                         /* If reviewers is empty, use agent. */
                         if(empty($node->reviewers[$index]->users) && isset($node->agentType))
@@ -205,6 +212,15 @@ class approvalflowModel extends model
                             default:
                                 $node->reviewers[$index]->users = array();
                                 break;
+                            }
+                        }
+
+                        if(isset($node->needReviewer) and $node->needReviewer == 'yes') 
+                        {
+                            if(empty($node->reviewers[$index]->users))
+                            {
+                                dao::$errors = sprintf($this->lang->approvalflow->errorList['nodeNeedReviewer'], $node->title);
+                                return false;
                             }
                         }
                     }

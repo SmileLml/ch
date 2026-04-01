@@ -94,6 +94,7 @@ $(function()
     $('#subNavbar li[data-id="testcase"]').addClass('active');
     if(hasStory)
     {
+        var count = 1;
         $("[name^='story']").each(function()
         {
             var id        = $(this).attr('id');
@@ -101,10 +102,16 @@ $(function()
             var moduleID  = $('#modules' + num).val();
             var branchID  = typeof($('#branches' + num).val()) == 'undefined' ? 0 : $('#branches' + num).val();
             var storyID   = $("#story" + num).val();
-            var storyLink = createLink('story', 'ajaxGetProductStories', 'productID=' + productID + '&branch=' + branchID + '&moduleID=' + moduleID + '&storyID=' + storyID +'&onlyOption=false&status=noclosed&limit=0&type=full&hasParent=1&objectID=0&number=' + num);
+            var source    = '';
+
+            if(count != 1) source = '&source=testcase';
+            count++;
+
+            var storyLink = createLink('story', 'ajaxGetProductStories', 'productID=' + productID + '&branch=' + branchID + '&moduleID=' + moduleID + '&storyID=' + storyID +'&onlyOption=false&status=noclosed&limit=0&type=full&hasParent=1&objectID=0&number=' + num  + source);
             $.get(storyLink, function(stories)
             {
                 if(!stories) stories = '<select id="story' + num + '" name="story[' + num + ']" class="form-control"></select>';
+
                 $('#story' + num).replaceWith(stories);
                 $('#story' + num + "_chosen").remove();
                 $('#story' + num).next('.picker').remove();

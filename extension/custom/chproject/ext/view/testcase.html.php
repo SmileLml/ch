@@ -59,6 +59,9 @@ body {margin-bottom: 10px;}
       <?php endif;?>
     </div>
   </div>
+  <?php
+  $canBatchClone = common::hasPriv('testcase', 'batchClone');
+  ?>
   <div class='main-col' data-min-width='400'>
     <?php if(empty($cases)):?>
     <div class="table-empty-tip">
@@ -76,7 +79,11 @@ body {margin-bottom: 10px;}
         <?php $vars = "projectID=$projectID&intanceProjectID=$intanceProjectID&productID=$productID&branchID=$branchID&type=$type&moduleID=$moduleID&orderBy=%s&recTotal={$pager->recTotal}&recPerPage={$pager->recPerPage}&pageID={$pager->pageID}";?>
           <thead>
             <tr>
-              <th class='w-id'>      <?php common::printOrderLink('id',            $orderBy, $vars, $lang->idAB);?></th>
+              <th class='w-id'>
+                <?php
+                if($canBatchClone) echo "<div class='checkbox-primary check-all' title='{$this->lang->selectAll}'><label></label></div>";
+                common::printOrderLink('id', $orderBy, $vars, $lang->idAB);?>
+              </th>
               <th class="c-project"> <?php common::printOrderLink('title',         $orderBy, $vars, $lang->testcase->title);?></th>
               <th class='c-pri'>     <?php common::printOrderLink('pri',           $orderBy, $vars, $lang->priAB);?></th>
               <th class='c-project'> <?php common::printOrderLink('projectID',     $orderBy, $vars, $lang->testcase->project);?></th>
@@ -98,14 +105,17 @@ body {margin-bottom: 10px;}
             ?>
             <tr>
               <td class="c-id">
-                <?php echo sprintf('%03d', $case->id); ?>
+                <?php
+                if($canBatchClone) echo html::checkbox('caseIDList', array($case->id => ''));
+                echo sprintf('%03d', $case->id);
+                ?>
               </td>
               <?php $params = "testcaseID=$caseID&version=$case->version";?>
               <?php $params = $type == 'assigntome' ? "testcaseID=$caseID&version=$case->version&from=testtask&taskID=$case->task" : "testcaseID=$caseID&version=$case->version&from=testcase&taskID=0&project=$projectID";?>
               <?php $icon = $case->auto == 'auto' ? "<i class='icon icon-ztf'></i> " : "<i class='icon icon-test'></i> ";?>
               <td class='c-title text-left' title="<?php echo $case->title?>"><?php echo $icon . html::a($this->createLink('testcase', 'view', $params, '', '', $case->project), $case->title, null, "style='color: $case->color' data-app='{$this->app->tab}'");?></td>
               <td><span class='label-pri <?php echo 'label-pri-' . $case->pri?>' title='<?php echo zget($lang->testcase->priList, $case->pri, $case->pri);?>'><?php echo zget($lang->testcase->priList, $case->pri, $case->pri)?></span></td>
-              <td><?php echo zget($projectPairs, $case->projectID, '');?></td>
+              <td><?php echo $case->linkProjectName;?></td>
               <td><?php echo zget($products, $case->productID, '');?></td>
               <td><?php echo zget($lang->testcase->typeList, $case->type);?></td>
               <td>
@@ -139,7 +149,21 @@ body {margin-bottom: 10px;}
           </tbody>
         </table>
       </div>
-      <div class="table-footer"><?php $pager->show('right', 'pagerjs');?></div>
+      <div class="table-footer">
+        <?php if($canBatchClone):?>
+        <div class="checkbox-primary check-all"><label><?php echo $lang->selectAll?></label></div>
+        <?php endif;?>
+        <div class='table-actions btn-toolbar'>
+          <div class='btn-group dropup'>
+            <?php
+            $actionLink = $this->createLink('testcase', 'batchClone');
+            $misc       = $canBatchClone ? "onclick=\"setFormAction('$actionLink', '', '#executionBugForm')\"" : "disabled='disabled'";
+             echo html::commonButton($lang->testcase->clone, $misc);
+            ?>
+          </div>
+        </div>
+        <?php $pager->show('right', 'pagerjs');?>
+      </div>
     </form>
     <?php endif;?>
   </div>

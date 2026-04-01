@@ -60,7 +60,27 @@
         ?>
         <?php $this->action->printAction($action);?>
         <?php if(!empty($action->history)):?>
+        <?php
+        // 检查是否有子表字段的修改
+        $oldVersion = '';
+        $newVersion = '';
+        if($action->objectType == 'projectapproval')
+        {
+            foreach($action->history as $history)
+            {
+                if($history->field == 'version')
+                {
+                    $oldVersion = $history->old;
+                    $newVersion = $history->new;
+                    break;
+                }
+            }
+        }
+        ?>
         <button type='button' class='btn btn-mini switch-btn btn-icon btn-expand' title='<?php echo $lang->switchDisplay;?>'><i class='change-show icon icon-plus icon-sm'></i></button>
+        <?php if($oldVersion != $newVersion):?>
+        <button class='btn btn-mini switch-btn btn-icon' title='<?php echo $lang->diff->childDiff;?>' data-loading='<?php echo $lang->loading;?>' onclick='childDiff(<?php echo $action->objectID;?>, <?php echo $action->id;?>);'><i class='icon icon-search icon-sm'></i></button>
+        <?php endif;?>
         <div class='history-changes' id='changeBox<?php echo $i;?>'>
           <?php echo $this->action->printChanges($action->objectType, $action->history);?>
         </div>
@@ -110,4 +130,31 @@ $(document).on('historiesReverse', '.histories-list', function(event, isAsc)
 {
     $.cookie('historyOrder', isAsc ? 'asc' : 'desc', {expires:config.cookieLife, path:config.webRoot});
 });
+
+function childDiff(objectID, actionID)
+{
+    $('#main').addClass('loading');
+
+    var ajaxLink = createLink('diff', 'ajaxGetChildDiffError', 'objectType=projectapproval&objectID=' + objectID + '&actionID=' + actionID);
+    var link     = createLink('diff', 'childDiff', 'objectType=projectapproval&objectID=' + objectID + '&actionID=' + actionID);
+    $.ajax(
+    {
+        url: ajaxLink,
+        dataType: 'json',
+        method: 'get',
+        success: function(data)
+        {
+            if(data.result == 'fail')
+            {
+                alert(data.message)
+                return false;
+            }
+            else
+            {
+                var modalTrigger = new $.zui.ModalTrigger({type: 'iframe', width: '80%', url: link});
+                modalTrigger.show();
+            }
+        }
+    })
+}
 </script>

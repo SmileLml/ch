@@ -1836,8 +1836,12 @@ class execution extends control
                 $_POST['plans'] = array_filter($_POST['plans']);
             }
 
+            //choose chteam
+            $_POST['chteam'] = isset($_POST['chteam']) ? implode(',',$_POST['chteam']) : '';
+
             $executionID = $this->execution->create($copyExecutionID);
             if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
+
 
             $this->execution->updateProducts($executionID);
             if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
@@ -1943,6 +1947,7 @@ class execution extends control
         $this->view->project             = $project;
         $this->view->division            = !empty($project) ? $project->division : 1;
         $this->view->type                = $type;
+        $this->view->chteam              = array_column($this->loadModel('chteam')->getList(),'name','id');
         $this->display();
     }
 
@@ -2002,6 +2007,9 @@ class execution extends control
         {
             $oldPlans    = $this->dao->select('plan')->from(TABLE_PROJECTPRODUCT)->where('project')->eq($executionID)->andWhere('plan')->ne(0)->fetchPairs('plan');
             $oldProducts = $this->product->getProducts($executionID, 'all', '', true, $linkedProductIdList);
+
+            $_POST['chteam'] = isset($_POST['chteam']) ? implode(',',$_POST['chteam']) : '';
+
             $changes     = $this->execution->update($executionID);
             if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
 
@@ -2136,6 +2144,8 @@ class execution extends control
             $parentStageList = $this->loadModel('programplan')->getParentStageList($execution->project, $executionID, $productID);
             unset($parentStageList[0]);
         }
+        
+        $chteam_list = array_column($this->loadModel('chteam')->getList('all'),'name','id');
 
         $this->view->title                = $title;
         $this->view->position             = $position;
@@ -2162,6 +2172,8 @@ class execution extends control
         $this->view->teamMembers          = $this->execution->getTeamMembers($executionID);
         $this->view->allProjects          = $this->project->getPairsByModel($project->model, 0, 'noclosed', $project->id);
         $this->view->parentStageList      = isset($parentStageList) ? $parentStageList : array();
+        $this->view->chteam               = $chteam_list;
+        $this->view->chteam_selected      = $execution->chteam;
 
         $this->display();
     }

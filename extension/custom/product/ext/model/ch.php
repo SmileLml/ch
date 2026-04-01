@@ -1,5 +1,119 @@
 <?php
 /**
+ * Build search form.
+ *
+ * @param  int    $productID
+ * @param  array  $products
+ * @param  int    $queryID
+ * @param  int    $actionURL
+ * @param  int    $branch
+ * @param  int    $projectID
+ * @access public
+ * @return void
+ */
+public function buildSearchForm($productID, $products, $queryID, $actionURL, $branch = 0, $projectID = 0)
+{
+    $productIdList = ($this->app->tab == 'project' and empty($productID)) ? array_keys($products) : $productID;
+    $branchParam   = ($this->app->tab == 'project' and empty($productID)) ? '' : $branch;
+    $projectID     = ($this->app->tab == 'project' and empty($projectID)) ? $this->session->project : $projectID;
+
+    $this->config->product->search['actionURL'] = $actionURL;
+    $this->config->product->search['queryID']   = $queryID;
+    $this->config->product->search['params']['plan']['values'] = $this->loadModel('productplan')->getPairs($productIdList, (empty($branchParam) or $branchParam == 'all') ? '' : $branchParam);
+
+    $product = ($this->app->tab == 'project' and empty($productID)) ? $products : array();
+    if(empty($product) and isset($products[$productID])) $product = array($productID => $products[$productID]);
+
+    $this->config->product->search['params']['product']['values'] = array('' => '') + $product + array('all' => $this->lang->product->allProduct);
+
+    $this->config->product->search['params']['stage']['values'] = array('' => '') + $this->lang->story->stageList;
+
+    if($this->config->edition == 'ipd') $this->config->product->search['params']['roadmap']['values'] = $this->loadModel('roadmap')->getPairs($productID);
+
+    /* Get modules. */
+    $this->loadModel('tree');
+    if($this->app->tab == 'project')
+    {
+        if($productID)
+        {
+            $modules          = array();
+            $branchList       = $this->loadModel('branch')->getPairs($productID, '', $projectID);
+            $branchModuleList = $this->tree->getOptionMenu($productID, 'story', 0, array_keys($branchList));
+            foreach($branchModuleList as $branchID => $branchModules) $modules = array_merge($modules, $branchModules);
+        }
+        else
+        {
+            $moduleList  = array();
+            $modules     = array('/');
+            $branchGroup = $this->loadModel('execution')->getBranchByProduct(array_keys($products), $projectID, '');
+            foreach($products as $productID => $productName)
+            {
+                if(isset($branchGroup[$productID]))
+                {
+                    $branchModuleList = $this->tree->getOptionMenu($productID, 'story', 0, array_keys($branchGroup[$productID]));
+                    foreach($branchModuleList as $branchID => $branchModules)
+                    {
+                        if(is_array($branchModules)) $moduleList += $branchModules;
+                    }
+                }
+                else
+                {
+                    $moduleList = $this->tree->getOptionMenu($productID, 'story', 0, $branch);
+                }
+
+                foreach($moduleList as $moduleID => $moduleName)
+                {
+                    if(empty($moduleID)) continue;
+                    $modules[$moduleID] = $productName . $moduleName;
+                }
+            }
+        }
+    }
+    else
+    {
+        $modules = $this->tree->getOptionMenu($productID, 'story', 0, $branch);
+    }
+
+    $this->config->product->search['params']['module']['values'] = array('' => '') + $modules;
+
+    if(isset($this->config->product->search['fields']['business']))
+    {
+        $businessPairs = $this->loadModel('project')->getBusinessPairs($projectID);
+        $this->config->product->search['params']['business']['values'] = $businessPairs;
+    }
+
+    if(isset($this->config->product->search['fields']['relatedRequirement']))
+    {
+
+        $requirementPairs = $this->dao->select('id,title')->from('zt_story')
+            ->where('deleted')->eq('0')
+            ->andWhere('type')->eq('requirement')
+            ->beginIF($this->app->tab == 'project')->andWhere('product')->in($productIdList)->fi()
+            ->beginIF($this->app->tab != 'project')->andWhere('product')->eq($productID)->fi()
+            ->fetchPairs();
+
+        $this->config->product->search['params']['relatedRequirement']['values'] = array('' => '') + $requirementPairs;
+    }
+
+    $productInfo   = $this->getById($productID);
+
+    if(!$productID or $productInfo->type == 'normal' or $this->app->tab == 'assetlib')
+    {
+        unset($this->config->product->search['fields']['branch']);
+        unset($this->config->product->search['params']['branch']);
+    }
+    else
+    {
+        $this->config->product->search['fields']['branch'] = sprintf($this->lang->product->branch, $this->lang->product->branchName[$productInfo->type]);
+        $this->config->product->search['params']['branch']['values']  = array('' => '', '0' => $this->lang->branch->main) + $this->loadModel('branch')->getPairs($productID, 'noempty');
+    }
+
+    if(!empty($productInfo->shadow)) unset($this->config->product->search['fields']['product']);
+
+    $this->loadModel('search')->setSearchParams($this->config->product->search);
+}
+
+/**
  * Create the select code of products.
  *
  * @param  array       $products

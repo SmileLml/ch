@@ -1,4 +1,195 @@
 <?php
+public function batchClone()
+{
+    $this->loadModel('common');
+    $now   = helper::now();
+    $cases = fixer::input('post')->get();
+    
+    $fromCaseIdList = $this->post->caseIDList;
+    $fromCases = $this->dao->select('*')->from('zt_case')->where('id')->in($fromCaseIdList)->fetchPairs('id');
+    foreach($cases->title as $i => $title)
+    {
+        if(!empty($cases->title[$i]) and empty($cases->type[$i])) return print(js::alert(sprintf($this->lang->error->notempty, $this->lang->testcase->type)));
+    }
+    foreach($cases->title as $i => $title)
+    {
+        if(empty($title) and $this->common->checkValidRow('testcase', $cases, $i))
+        {
+            dao::$errors['message'][] = sprintf($this->lang->error->notempty, $this->lang->testcase->title);
+            return false;
+        }
+    }
+
+    $this->loadModel('story');
+    $extendFields   = $this->loadModel('flow')->getExtendFields('testcase', 'create');
+    $storyVersions  = array();
+    $forceNotReview = $this->forceNotReview();
+    $data           = array();
+    foreach($cases->title as $i => $title)
+    {
+        if(empty($title)) continue;
+        $currentFromCaseID = $cases->caseIDList[$i];
+        $currentFromCase   = $this->getByID($currentFromCaseID);
+
+        $data[$i] = new stdclass();
+        $data[$i]->product      = $cases->product[$i];
+        $data[$i]->branch       = isset($cases->branch[$i]) ? $cases->branch[$i] : 0;
+        $data[$i]->project      = $cases->project[$i];
+        $data[$i]->module       = $cases->modules[$i];
+        $data[$i]->execution    = $cases->execution[$i];
+        $data[$i]->scene        = $cases->scene[$i];
+        $data[$i]->story        = $cases->story[$i];
+        $data[$i]->color        = $cases->color[$i];
+        $data[$i]->title        = $cases->title[$i];
+        $data[$i]->precondition = $cases->precondition[$i];
+        $data[$i]->keywords     = $cases->keywords[$i];
+        $data[$i]->type         = $cases->type[$i];
+        $data[$i]->pri          = $cases->pri[$i];
+        $data[$i]->stage        = empty($cases->stage[$i]) ? '' : implode(',', $cases->stage[$i]);
+        $data[$i]->openedBy     = $this->app->user->account;
+        $data[$i]->openedDate   = $now;
+        $data[$i]->status       = $forceNotReview || $cases->needReview[$i] == 0 ? 'normal' : 'wait';
+        $data[$i]->version      = 1;
+        $data[$i]->files        = $currentFromCase->files;
+        $data[$i]->steps        = $currentFromCase->steps;
+
+        $caseStory = $data[$i]->story;
+        $data[$i]->storyVersion = isset($storyVersions[$caseStory]) ? $storyVersions[$caseStory] : 0;
+        if($caseStory and !isset($storyVersions[$caseStory]))
+        {
+            $data[$i]->storyVersion = $this->story->getVersion($caseStory);
+            $storyVersions[$caseStory] = $data[$i]->storyVersion;
+        }
+
+        foreach($extendFields as $extendField)
+        {
+            $data[$i]->{$extendField->field} = $currentFromCase->$extendField->field;
+            if(is_array($data[$i]->{$extendField->field})) $data[$i]->{$extendField->field} = join(',', $data[$i]->{$extendField->field});
+
+            $data[$i]->{$extendField->field} = htmlSpecialString($data[$i]->{$extendField->field});
+        }
+
+        foreach(explode(',', $this->config->testcase->create->requiredFields) as $field)
+        {
+            $field = trim($field);
+            if($field and empty($data[$i]->$field)) return helper::end(js::alert(sprintf($this->lang->error->notempty, $this->lang->testcase->$field)));
+        }
+    }
+
+    $caseIDList = array();
+    foreach($data as $i => $case)
+    {
+        $files = $case->files;
+        $steps = $case->steps;
+        unset($case->files);
+        unset($case->steps);
+        $this->dao->insert(TABLE_CASE)->data($case)
+            ->autoCheck()
+            ->batchCheck($this->config->testcase->create->requiredFields, 'notempty')
+            ->checkFlow()
+            ->exec();
+
+        if(dao::isError())
+        {
+            echo js::error(dao::getError());
+            return print(js::reload('parent'));
+        }
+
+        $caseID       = $this->dao->lastInsertID();
+
+        foreach($steps as $stepID => $step)
+        {
+            unset($step->id);
+            $step->version = 1;
+            $step->case    = $caseID;
+            $this->dao->insert(TABLE_CASESTEP)->data($step)->autoCheck()->exec();
+        }
+
+        foreach($files as $fileID => $file)
+        {
+            $fileName = pathinfo($file->pathname, PATHINFO_FILENAME);
+            $datePath = substr($file->pathname, 0, 6);
+            $realPath = $this->app->getAppRoot() . "www/data/upload/{$this->app->company->id}/" . "{$datePath}/" . $fileName;
+
+            $rand        = rand();
+            $newFileName = $fileName . 'copy' . $rand;
+            $newFilePath = $this->app->getAppRoot() . "www/data/upload/{$this->app->company->id}/" . "{$datePath}/" .  $newFileName;
+            copy($realPath, $newFilePath);
+
+            $newFileName = $file->pathname;
+            $newFileName = str_replace('.', "copy$rand.", $newFileName);
+
+            unset($file->id, $file->realPath, $file->webPath);
+            $file->objectID = $caseID;
+            $file->pathname = $newFileName;
+            $this->dao->insert(TABLE_FILE)->data($file)->exec();
+            $newFiles .= $this->dao->lastInsertId() . ',';
+        }
+
+        $caseIDList[] = $caseID;
+
+        $this->dao->update(TABLE_CASE)->set('sort')->eq($caseID)->where('id')->eq($caseID)->exec();
+
+        $this->executeHooks($caseID);
+
+        $this->loadModel('score')->create('testcase', 'create', $caseID);
+        $actionID = $this->loadModel('action')->create('case', $caseID, 'Opened');
+
+        /* If the story is linked project, make the case link the project. */
+        $this->syncCase2Project($case, $caseID);
+    }
+    if(!dao::isError()) $this->loadModel('score')->create('ajax', 'batchCreate');
+    return $caseIDList;
+}
+
+/**
+ * Sync file for lib link case.
+ *
+ * @param  int    $currentCaseID
+ * @param  int    $libCaseID
+ * @param  array  $changes
+ * @access public
+ * @return array|bool
+ */
+public function syncFileForLibLinkCase($currentCaseID, $libCaseID, $changes)
+{
+    $case    = $this->getByID($currentCaseID);
+    $libCase = $this->getByID($libCaseID);
+
+    $oldFiles = '';
+    foreach($libCase->files as $fileID => $file)
+    {
+        $oldFiles .= $fileID . ',';
+    }
+    $oldFiles = trim($oldFiles, ',');
+
+    $this->dao->delete()->from(TABLE_FILE)->where('objectType')->eq('testcase')->andWhere('objectID')->eq($libCaseID)->exec();
+
+    $newFiles = '';
+    foreach($case->files as $fileID => $file)
+    {
+        $fileName = pathinfo($file->pathname, PATHINFO_FILENAME);
+        $datePath = substr($file->pathname, 0, 6);
+        $realPath = $this->app->getAppRoot() . "www/data/upload/{$this->app->company->id}/" . "{$datePath}/" . $fileName;
+
+        $rand        = rand();
+        $newFileName = $fileName . 'copy' . $rand;
+        $newFilePath = $this->app->getAppRoot() . "www/data/upload/{$this->app->company->id}/" . "{$datePath}/" .  $newFileName;
+        copy($realPath, $newFilePath);
+
+        $newFileName = $file->pathname;
+        $newFileName = str_replace('.', "copy$rand.", $newFileName);
+
+        unset($file->id, $file->realPath, $file->webPath);
+        $file->objectID = $libCaseID;
+        $file->pathname = $newFileName;
+        $this->dao->insert(TABLE_FILE)->data($file)->exec();
+        $newFiles .= $this->dao->lastInsertId() . ',';
+    }
+    $newFiles  = trim($newFiles, ',');
+    $changes[] = array('field' => 'files', 'old' => $oldFiles, 'new' => $newFiles, 'diff' => '');
+    return $changes;
+}
 /**
  * Get case info by ID.
  *
@@ -55,6 +246,7 @@ public function getById($caseID, $version = 0)
     foreach($toBugs as $toBug) $case->toBugs[$toBug->id] = $toBug->title;
 
     if($case->linkCase or $case->fromCaseID) $case->linkCaseTitles = $this->dao->select('id,title')->from(TABLE_CASE)->where('id')->in($case->linkCase)->orWhere('id')->eq($case->fromCaseID)->fetchPairs();
+    if($case->callCaseID) $case->callCaseTitles = $this->dao->select('id,title')->from(TABLE_CASE)->where('id')->in($case->callCaseID)->fetchPairs();
     if($version == 0) $version = $case->version;
     $case->files = $this->loadModel('file')->getByObject('testcase', $caseID);
     $case->currentVersion = $version ? $version : $case->version;
@@ -382,4 +574,66 @@ public function updateCase2Project($oldCase, $case, $caseID)
             }
         }
     }
+}
+
+
+/**
+ * Get xmind config.
+ *
+ * @access public
+ * @return array
+ */
+function getXmindConfig()
+{
+    $configItems = $this->dao->select("`key`,value")->from(TABLE_CONFIG)
+        ->where('owner')->eq($this->app->user->account)
+        ->andWhere('module')->eq('testcase')
+        ->andWhere('section')->eq('xmind')
+        ->fetchAll();
+
+    $config = array();
+    foreach($configItems as $item) $config[$item -> key] = $item -> value;
+
+    if(!isset($config['module']))       $config['module']       = 'M';
+    if(!isset($config['scene']))        $config['scene']        = 'S';
+    if(!isset($config['case']))         $config['case']         = 'C';
+    if(!isset($config['pri']))          $config['pri']          = 'P';
+    if(!isset($config['group']))        $config['group']        = 'G';
+    if(!isset($config['precondition'])) $config['precondition'] = 'F';
+
+    return $config;
+}
+
+
+/**
+ * Get case by product and module.
+ *
+ * @param  int $productID
+ * @param  int $moduleID
+ * @access public
+ * @return array
+ */
+function getCaseByProductAndModule($productID, $moduleID)
+{
+    $fields = "t2.id as productID,"
+        . "t2.`name` as productName,"
+        . "t3.id as moduleID,"
+        . "t3.`name` as moduleName,"
+        . "t4.id as sceneID,"
+        . "t4.title as sceneName,"
+        . "t1.id as testcaseID,"
+        . "t1.title as `name`,"
+        . "t1.pri,"
+        . "t1.precondition";
+
+    $caseList = $this->dao->select($fields)->from(TABLE_CASE)->alias('t1')
+        ->leftJoin(TABLE_PRODUCT)->alias('t2')->on('t1.product = t2.id')
+        ->leftJoin(TABLE_MODULE)->alias('t3')->on('t1.module = t3.id')
+        ->leftJoin(TABLE_SCENE)->alias('t4')->on('t1.scene = t4.id')
+        ->where('t1.deleted')->eq(0)
+        ->andWhere('t1.product')->eq($productID)
+        ->beginIF($moduleID > 0)->andWhere('t1.module')->eq($moduleID)->fi()
+        ->fetchAll();
+
+    return $caseList;
 }

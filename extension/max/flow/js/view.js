@@ -31,9 +31,15 @@ $(document).ready(function()
         }
     })
 
+    $('a.reloadPage').attr('data-url', $('a.reloadPage').attr('href'));
+    $('a.reloadPage').attr('href', 'javascript:void(0);');
+
     $('.reloadPage').click(function()
     {
-        url = $(this).attr('href');
+        url = $(this).attr('data-url');
+        tempThis = $(this)
+        $(this).css('pointer-events', 'none');
+        $(this).css('color', '#808080');
 
         $.getJSON(url, function(response)
         {

@@ -58,4 +58,10 @@ $config->group->package->deleteChproject->subset = 'chproject';
 $config->group->package->deleteChproject->privs  = array();
 $config->group->package->deleteChproject->privs['chproject-delete'] = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd,lite', 'order' => 5, 'depend' => array(), 'recommend' => array());
 
-$config->group->package->user->privs['company-syncInfo']      = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd,lite,or', 'order' => 0, 'depend' => array('admin-index', 'admin-register'), 'recommend' => array('user-view'));
+$config->group->package->user->privs['company-syncInfo'] = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd,lite,or', 'order' => 0, 'depend' => array('admin-index', 'admin-register'), 'recommend' => array('user-view'));
+
+$config->group->package->manageTask->privs['task-batchChangeStory']     = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd,lite', 'order' => 3, 'depend' => array('execution-task'), 'recommend' => array('task-edit'));
+$config->group->package->manageTask->privs['task-batchChangeExecution'] = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd,lite', 'order' => 3, 'depend' => array('execution-task'), 'recommend' => array());
+
+$config->group->package->manageCase->privs['testcase-batchClone'] = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 3, 'depend' => array(), 'recommend' => array());
+$config->group->package->manageCase->privs['testcase-syncEdit'] = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 3, 'depend' => array(), 'recommend' => array());

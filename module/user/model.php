@@ -102,7 +102,7 @@ class userModel extends model
 
         $users = $this->dao->select($fields)->from(TABLE_USER)
             ->where('1=1')
-            ->beginIF(strpos($params, 'nodeleted') !== false or empty($this->config->user->showDeleted))->andWhere('deleted')->eq('0')->fi()
+            ->beginIF((strpos($params, 'nodeleted') !== false or empty($this->config->user->showDeleted)) and (($this->app->rawMethod != 'view' and $this->app->rawMethod != 'browse') or $this->app->rawModule != 'projectapproval'))->andWhere('deleted')->eq('0')->fi()
             ->beginIF(strpos($params, 'all') === false)->andWhere('type')->eq($type)->fi()
             ->beginIF($accounts)->andWhere('account')->in($accounts)->fi()
             ->beginIF($this->config->vision and $this->app->rawModule !== 'kanban')->andWhere("CONCAT(',', visions, ',')")->like("%,{$this->config->vision},%")->fi()
@@ -140,7 +140,7 @@ class userModel extends model
             {
                 $firstLetter = ucfirst(mb_substr($user->account, 0, 1)) . ':';
                 if(strpos($params, 'noletter') !== false or !empty($this->config->isINT)) $firstLetter = '';
-                $users[$account] =  $firstLetter . (($user->deleted and strpos($params, 'realname') === false) ? $user->account : ($user->realname ? $user->realname : $user->account));
+                $users[$account] =  $firstLetter . ((($user->deleted and strpos($params, 'realname') === false) and ($this->app->rawMethod != 'view' and $this->app->rawModule != 'projectapproval')) ? $user->account : ($user->realname ? $user->realname : $user->account));
             }
         }
 

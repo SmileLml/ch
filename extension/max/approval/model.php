@@ -371,6 +371,56 @@ class approvalModel extends model
         $flow  = $this->approvalflow->getByID($flowID, $version);
         $nodes = json_decode($flow->nodes);
 
+        if($objectType == 'projectapproval' && $objectID)
+        {
+            $projectapproval = $this->dao->select('*')->from('zt_flow_projectapproval')->where('id')->eq($objectID)->fetch();
+
+            if($projectapproval && $projectapproval->businessCancel == 'Y')
+            {
+                $ITnode = new stdClass();
+                $ITnode->id         = 'ITchp55ewcj';
+                $ITnode->type       = 'approval';
+                $ITnode->title      = $this->lang->approval->itPMApproval;
+                $ITnode->reviewType = 'manual';
+                $ITnode->multiple   = 'and';
+                $ITnode->agentType  = 'pass';
+                $ITnode->onlyBy     = 'yes';
+
+                $ITreviewers = new stdClass();
+                $ITreviewers->type         = 'groupMember';
+                $ITreviewers->groupMembers = ['itPM'];
+
+                $ITnode->reviewers = [$ITreviewers];
+                $ITnode->ccs       = [];
+
+                //插入到第二个数组之后
+                array_splice($nodes, 2, 0, [$ITnode]);
+
+                $itPM = [];
+
+                $_POST['approval_id']                  = $_POST['approval_id'] + ['ITchp55ewcj'];
+                $_POST['approval_ccer']['ITchp55ewcj'] = [];
+
+                if(isset($_POST['children']['sub_projectmembers']['projectRole']))
+                {
+                    foreach($_POST['children']['sub_projectmembers']['projectRole'] as $roleIndex => $projectRole)
+                    {
+                        if($projectRole == 'itPM')
+                        {
+                            $account = $_POST['children']['sub_projectmembers']['account'][$roleIndex];
+                            $itPM[]  = $account;
+
+                            $_POST['approval_reviewer']['ITchp55ewcj'][] = $account;
+                        }
+                    }
+                }
+
+                $part1 = array_slice($reviewers, 0, 1, true); // 保留原键
+                $part2 = array_slice($reviewers, 1, null, true);
+                $reviewers = $part1 + ['ITchp55ewcj' => ['reviewers' => $itPM, 'ccs' => []]] + $part2;
+            }
+        }
+
         $upLevel = '';
         /* If I am a manager, use it firstly. */
         $parent = $this->dao->select('parent')->from(TABLE_DEPT)->where('manager')->eq($this->app->user->account)->andWhere('parent')->ne(0)->orderBy('grade')->fetch('parent');
@@ -419,83 +469,118 @@ class approvalModel extends model
      * @param  array  $ccers
      * @param  array  $nodeIdList
      * @param  string $type
+     * @param  string $action
      * @access public
      * @return string If finished, return pass|fail.
      */
-    public function createApprovalObject($root = 0, $objectID = 0, $objectType = 0, $reviewers = array(), $ccers = array(), $nodeIdList = array(), $type = '')
-    {
-        /* Create approval. */
-        if($objectType == 'review')
-        {
-            $approvalflowObject = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)->where('root')->eq($root)->andWhere('objectType')->eq($type)->fetch();
-            $flowID = $approvalflowObject ? $approvalflowObject->flow : $this->dao->select('*')->from(TABLE_APPROVALFLOW)->where('code')->eq('simple')->fetch()->id;
-        }
-        else
-        {
-            $approvalflowObject = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)->where('root')->eq($root)->andWhere('objectType')->eq($objectType)->fetch();
-            if(!$approvalflowObject) return false;
-            $flowID = $approvalflowObject->flow;
-        }
+     public function createApprovalObject($root = 0, $objectID = 0, $objectType = 0, $reviewers = array(), $ccers = array(), $nodeIdList = array(), $type = '', $action = '')
+     {
+         /* Create approval. */
+         if($objectType == 'review')
+         {
+             $approvalflowObject = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)->where('root')->eq($root)->andWhere('objectType')->eq($type)->fetch();
+             $flowID = $approvalflowObject ? $approvalflowObject->flow : $this->dao->select('*')->from(TABLE_APPROVALFLOW)->where('code')->eq('simple')->fetch()->id;
+         }
+         else
+         {
+             /* 如果是工作流绑定的审批流，符合前置条件的才可以发起审批。 */
+             $workflow = $this->loadModel('workflow')->getByModule($objectType);
+             if($workflow)
+             {
+                 if($action && strpos($action, 'approvalsubmit') !== false)
+                 {
+                     $actionKey = $result = str_replace("approvalsubmit", "", $action);
 
-        $approvalUsers = array();
-        foreach($nodeIdList as $id)
-        {
-            $approvalUsers[$id] = array('reviewers' => array(), 'ccs' => array());
+                     $flowID = $this->dao->select('flow')->from(TABLE_APPROVALFLOWOBJECT)
+                         ->where('root')->eq($root)
+                         ->andWhere('objectType')->eq($objectType)
+                         ->andWhere('condition')->like('%"actionKey":' . $actionKey . '%')
+                         ->fetch('flow');
+                 }
+                 else
+                 {
+                     $data  = $this->loadModel('flow')->getDataByID($workflow, $objectID);
+                     $flows = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)
+                         ->where('root')->eq($root)
+                         ->andWhere('objectType')->eq($objectType)
+                         ->fetchAll('id');
 
-            if(isset($reviewers[$id]))
-            {
-                foreach($reviewers[$id] as $reviewer)
-                {
-                    if($reviewer) $approvalUsers[$id]['reviewers'][] = $reviewer;
-                }
-            }
+                     foreach($flows as $flow)
+                     {
+                         $conditions = json_decode($flow->condition);
+                         if($this->flow->checkConditions(array($conditions), $data)) $flowID = $flow->flow;
+                     }
+                 }
+             }
+             else
+             {
+                 $approvalflowObject = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)->where('root')->eq($root)->andWhere('objectType')->eq($objectType)->fetch();
+                 if(!$approvalflowObject) return false;
+                 $flowID = $approvalflowObject->flow;
+             }
+         }
 
-            if(isset($ccers[$id]))
-            {
-                foreach($ccers[$id] as $ccer)
-                {
-                    if($ccer) $approvalUsers[$id]['ccs'][] = $ccer;
-                }
-            }
-        }
+         $approvalUsers = array();
+         foreach($nodeIdList as $id)
+         {
+             $approvalUsers[$id] = array('reviewers' => array(), 'ccs' => array());
 
-        /* If submit a new approval, set old approval status as done. */
-        $oldApproval = $this->getByObject($objectType, $objectID);
-        if($oldApproval)
-        {
-            $this->dao->update(TABLE_APPROVAL)->set('status')->eq('done')->where('id')->eq($oldApproval->id)->exec();
-            $this->dao->update(TABLE_APPROVALNODE)->set('status')->eq('done')->where('approval')->eq($oldApproval->id)->exec();
-        }
+             if(isset($reviewers[$id]))
+             {
+                 foreach($reviewers[$id] as $reviewer)
+                 {
+                     if($reviewer) $approvalUsers[$id]['reviewers'][] = $reviewer;
+                 }
+             }
 
-        $approvalID = $this->create($flowID, $approvalUsers, 0, $objectType, $objectID);
+             if(isset($ccers[$id]))
+             {
+                 foreach($ccers[$id] as $ccer)
+                 {
+                     if($ccer) $approvalUsers[$id]['ccs'][] = $ccer;
+                 }
+             }
+         }
 
-        $data = new stdclass();
-        $data->approval   = $approvalID;
-        $data->objectType = $objectType;
-        $data->objectID   = $objectID;
-        $this->dao->insert(TABLE_APPROVALOBJECT)->data($data)->exec();
+         /* If submit a new approval, set old approval status as done. */
+         $oldApproval = $this->getByObject($objectType, $objectID);
+         if($oldApproval)
+         {
+             $this->dao->update(TABLE_APPROVAL)->set('status')->eq('done')->where('id')->eq($oldApproval->id)->exec();
+             $this->dao->update(TABLE_APPROVALNODE)->set('status')->eq('done')->where('approval')->eq($oldApproval->id)->exec();
+         }
 
-        /* Run approval. */
-        $this->next($approvalID, '', 'submit');
+         $approvalID = $this->create($flowID, $approvalUsers, 0, $objectType, $objectID);
 
-        /* If the flow is finished, change status of approval. */
-        $doing = $this->dao->select('*')->from(TABLE_APPROVALNODE)
-            ->where('approval')->eq($approvalID)
-            ->andWhere('status')->eq('doing')
-            ->fetchAll();
+         if(!$approvalID) return false;
 
-        if(empty($doing))
-        {
-            $reject = $this->dao->select('*')->from(TABLE_APPROVALNODE)->where('approval')->eq($approvalID)->andWhere('result')->eq('fail')->fetchAll();
+         $data = new stdclass();
+         $data->approval   = $approvalID;
+         $data->objectType = $objectType;
+         $data->objectID   = $objectID;
+         $this->dao->insert(TABLE_APPROVALOBJECT)->data($data)->exec();
 
-            $result = empty($reject) ? 'pass' : 'fail';
-            $this->finish($approvalID, $result, 'submit');
+         /* Run approval. */
+         $this->next($approvalID, '', 'submit');
 
-            return array('result' => $result, 'approvalID' => $approvalID);
-        }
+         /* If the flow is finished, change status of approval. */
+         $doing = $this->dao->select('*')->from(TABLE_APPROVALNODE)
+             ->where('approval')->eq($approvalID)
+             ->andWhere('status')->eq('doing')
+             ->fetchAll();
 
-        return array('result' => '', 'approvalID' => $approvalID);
-    }
+         if(empty($doing))
+         {
+             $reject = $this->dao->select('*')->from(TABLE_APPROVALNODE)->where('approval')->eq($approvalID)->andWhere('result')->eq('fail')->fetchAll();
+
+             $result = empty($reject) ? 'pass' : 'fail';
+             $this->finish($approvalID, $result, 'submit');
+
+             return array('result' => $result, 'approvalID' => $approvalID);
+         }
+
+         return array('result' => '', 'approvalID' => $approvalID);
+     }
 
     /**
      * Insert node.
@@ -1074,7 +1159,6 @@ class approvalModel extends model
             ->andWhere('status')->eq('doing')
             ->andWhere('account')->eq($this->app->user->account)
             ->fetchAll();
-
         foreach($nodes as $node)
         {
             $this->dao->update(TABLE_APPROVALNODE)->data($data)->where('id')->eq($node->id)->exec();
@@ -1114,6 +1198,25 @@ class approvalModel extends model
             ->where('approval')->eq($approvalID)
             ->andWhere('status')->eq('doing')
             ->fetchAll();
+
+        if(empty($doing) && $objectType == 'business')
+        {
+            $business = $this->dao->select('*')->from('zt_flow_business')->where('id')->eq($object->id)->fetch();
+            if($business->isITConfirm == 'N' && $business->project)
+            {
+                $itPM = $this->dao->select('account')->from('zt_flow_projectmembers')->where('parent')->eq($business->project)->andWhere('projectRole')->eq('itPM')->fetch('account');
+                $nodeTemplate = current($nodes);
+                unset($nodeTemplate->id);
+                $nodeTemplate->account = $itPM;
+                $this->dao->insert(TABLE_APPROVALNODE)->data($nodeTemplate)->exec();
+
+                if(!dao::isError()) $this->dao->update('zt_flow_business')
+                                        ->set('isITConfirm')->eq('Y')
+                                        ->where('id')->eq($object->id)
+                                        ->exec();
+                return false;
+            }
+        }
 
         if(empty($doing))
         {

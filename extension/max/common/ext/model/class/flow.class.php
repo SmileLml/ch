@@ -161,6 +161,10 @@ class flowCommon extends commonModel
             if(!isset($this->lang->{$flow->module})) $this->lang->{$flow->module} = new stdclass();
             $this->lang->{$flow->module}->common  = $flow->name;
             $this->lang->mainNav->{$flow->module} = "{$this->lang->navIcons['workflow']} {$flow->name}|{$flow->module}|browse|";
+
+            if($flow->module == 'business')        $this->lang->mainNav->{$flow->module} = "<i class='icon icon-treemap-alt'></i> {$flow->name}|{$flow->module}|browse|";
+            if($flow->module == 'projectapproval') $this->lang->mainNav->{$flow->module} = "<i class='icon icon-fields'></i> {$flow->name}|{$flow->module}|browse|";
+
             if($tab == $flow->module)
             {
                 if(!isset($this->lang->{$flow->module}))       $this->lang->{$flow->module} = new stdclass();

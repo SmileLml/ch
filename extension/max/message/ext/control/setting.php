@@ -10,11 +10,15 @@ class myMessage extends message
             $this->config->message->objectTypes[$flow->module][] = 'cancel';
             $this->config->message->objectTypes[$flow->module][] = 'review';
 
-            foreach(array('message', 'mail', 'sms', 'xuanxuan', 'webhook') as $module)
+            foreach(array('message', 'mail', 'sms', 'xuanxuan', 'webhook', 'flashsms') as $module)
             {
-                $this->config->message->available[$module][$flow->module][] = 'submit';
-                $this->config->message->available[$module][$flow->module][] = 'cancel';
                 $this->config->message->available[$module][$flow->module][] = 'review';
+
+                if($module != 'flashsms') 
+                {
+                    $this->config->message->available[$module][$flow->module][] = 'submit';
+                    $this->config->message->available[$module][$flow->module][] = 'cancel';
+                }
             }
         }
 

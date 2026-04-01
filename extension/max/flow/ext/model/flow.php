@@ -202,3 +202,13 @@ public function getLinkageScript($action, $fields)
 {
     return $this->loadExtension('flow')->getLinkageScript($action, $fields);
 }
+
+public function checkApprovalReview($action, $data)
+{
+    return $this->loadExtension('flow')->checkApprovalReview($action, $data);
+}
+
+public function checkApprovalReviewMethod($action, $data)
+{
+    return $this->loadExtension('flow')->checkApprovalReviewMethod($action, $data);
+}

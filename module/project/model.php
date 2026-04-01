@@ -1084,6 +1084,57 @@ class projectModel extends model
     }
 
     /**
+     * Get project pairs by PM.
+     *
+     * @access public
+     * @return object
+     */
+    public function getPairsByPM($param = '', $append = '')
+    {
+        $rawModule = $this->app->rawModule;
+        $rawMethod = $this->app->rawMethod;
+        $isGetAll  = false;
+        $paramAll  = strpos($param, 'all') !== false;
+
+        /* Using modules as a basis for conditional branching. */
+        if(in_array($rawModule, array('business')))
+        {
+            if(in_array($rawMethod, array('browse', 'view'))) $isGetAll = true;
+        }
+        else
+        {
+            if(in_array($rawMethod, array('browse', 'view'))) $isGetAll = true;
+
+            if(in_array($rawMethod, array('edit')))
+            {
+                $requestUri = $_SERVER['REQUEST_URI'];
+                $requestUri = ltrim($requestUri, '/');
+                $parts      = explode('-', $requestUri);
+                if(isset($parts[2]) && !empty($parts[2]))
+                {
+                    $dataID = explode('.', $parts[2])[0];
+                    $data   = $this->loadModel($rawModule)->getByID($dataID);
+                    $append = isset($data->project) ? $data->project : '';
+                }
+            }
+        }
+
+        $projectPairs = $this->dao->select('id, name')->from(TABLE_PROJECT)
+            ->where('type')->eq('project')
+            ->andWhere('deleted')->eq(0)
+            ->beginIF(!$this->app->user->admin && !$isGetAll && !$paramAll)->andWhere('PM')->eq($this->app->user->account)->fi()
+            ->fetchPairs();
+
+        if(!$append) return $projectPairs;
+
+        $appendPairs = $this->dao->select('id, name')->from(TABLE_PROJECT)
+            ->where('id')->in($append)
+            ->fetchPairs();
+
+        return $projectPairs + $appendPairs;
+    }
+
+    /**
      * Get project pairs by model and project.
      *
      * @param  string           $model all|scrum|waterfall|kanban
@@ -2866,6 +2917,10 @@ class projectModel extends model
                 unset($lang->project->menu->projectplan);
             }
         }
+        if($project->projectType == '1')
+        {
+            unset($lang->project->menu->storyGroup['dropMenu']->business);
+        }
 
         if(!empty($this->config->URAndSR) && $project->model !== 'kanban' && isset($lang->project->menu->storyGroup))
         {
@@ -3259,5 +3314,57 @@ class projectModel extends model
         $project = $this->dao->select('end')->from(TABLE_PROJECT)->where('id')->eq($projectID)->fetch();
         $this->dao->update(TABLE_PROJECT)->set('firstEnd')->eq($project->end)->where('id')->eq($projectID)->exec();
         return !dao::isError();
+    }
+
+    /**
+     * Get project approval pairs and filter by method.
+     *
+     * @param  string $param
+     * @param  string $append
+     * @access public
+     * @return void
+     */
+    public function getProjectApprovalPairs($param = '', $append = '')
+    {
+        $rawModule = $this->app->rawModule;
+        $rawMethod = $this->app->rawMethod;
+        $isGetAll  = false;
+        $paramAll  = strpos($param, 'all') !== false;
+
+        /* Using modules as a basis for conditional branching. */
+        if(in_array($rawModule, array('business')))
+        {
+            if(in_array($rawMethod, array('browse', 'view'))) $isGetAll = true;
+        }
+        else
+        {
+            if(in_array($rawMethod, array('browse', 'view'))) $isGetAll = true;
+
+            if(in_array($rawMethod, array('edit')))
+            {
+                $requestUri = $_SERVER['REQUEST_URI'];
+                $requestUri = ltrim($requestUri, '/');
+                $parts      = explode('-', $requestUri);
+                if(isset($parts[2]) && !empty($parts[2]))
+                {
+                    $dataID = explode('.', $parts[2])[0];
+                    $data   = $this->loadModel($rawModule)->getByID($dataID);
+                    $append = isset($data->projectApproval) ? $data->projectApproval : '';
+                }
+            }
+        }
+
+        $approvalPairs = $this->dao->select('id, name')->from('zt_flow_projectapproval')
+            ->where('deleted')->eq('0')
+            ->beginIF(!$isGetAll && !$paramAll)->andWhere('`status`')->eq('draft')->fi()
+            ->fetchPairs();
+
+        if(!$append) return $approvalPairs;
+
+        $appendPairs = $this->dao->select('id, name')->from('zt_flow_projectapproval')
+            ->where('id')->in($append)
+            ->fetchPairs();
+
+        return $approvalPairs + $appendPairs;
     }
 }

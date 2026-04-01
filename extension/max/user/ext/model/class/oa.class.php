@@ -4,9 +4,16 @@ class oaUser extends userModel
     public function getDeptPairs($params = '', $dept = '')
     {
         $users = $this->dao->select('account, realname')->from(TABLE_USER)
-            ->where(1)
+            ->where("(1")
             ->beginIF(strpos($params, 'nodeleted') !== false)->andWhere('deleted')->eq('0')->fi()
-            ->beginIF($dept != 0)->andWhere('dept')->in($dept)->fi()
+            ->beginIF($dept)->andWhere('dept')->in($dept)->fi()
+            ->beginIF(strpos($params, 'members:') !== false)
+            ->andWhere('account')->in(explode(',', str_replace('members:', '', $params)))
+            ->fi()
+            ->markRight(1)
+            ->beginIF(strpos($params, 'appends:') !== false)
+            ->orWhere('account')->in(explode(',', str_replace('appends:', '', $params)))
+            ->fi()
             ->orderBy('id_asc')
             ->fetchPairs();
 

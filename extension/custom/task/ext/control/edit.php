@@ -32,6 +32,19 @@ class mytask extends task
             $changes = array();
             if(!$comment or $comment == 'false')
             {
+                if($_POST['story'] && $task->parent != '-1')
+                {
+                    $story = $this->loadModel('story')->getById($_POST['story']);
+
+                    $linkedStoryEstimate = $this->dao->select('sum(estimate) as estimateSum')->from('zt_task')
+                        ->where('story')->eq($_POST['story'])
+                        ->andWhere('id')->ne($taskID)
+                        ->andWhere('deleted')->eq('0')
+                        ->andWhere('parent')->ne('-1')
+                        ->fetch('estimateSum');
+
+                    if((int)$linkedStoryEstimate + $_POST['estimate'] > ($story->estimate * 8)) return $this->send(array('result' => 'fail', 'message' => $this->lang->task->beyondEstimateError));
+                }
                 $changes = $this->task->update($taskID);
                 if(dao::isError()) return print(js::error(dao::getError()));
             }
@@ -109,7 +122,7 @@ class mytask extends task
         $this->view->title         = $this->lang->task->edit . 'TASK' . $this->lang->colon . $this->view->task->name;
         $this->view->position[]    = $this->lang->task->common;
         $this->view->position[]    = $this->lang->task->edit;
-        $this->view->stories       = $this->story->getExecutionStoryPairs($this->view->execution->id, 0, 'all', '', 'full', 'active');
+        $this->view->stories       = $this->story->getExecutionStoryPairs($this->view->execution->id, 0, 'all', '', 'full', 'all');
         $this->view->tasks         = $tasks;
         $this->view->users         = $this->loadModel('user')->getPairs('nodeleted|noclosed', "{$this->view->task->openedBy},{$this->view->task->canceledBy},{$this->view->task->closedBy}");
         $this->view->showAllModule = true;

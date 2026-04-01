@@ -24,6 +24,7 @@ js::set('confirmToDeactivate', $lang->workflow->tips->deactivate);
     <?php echo baseHTML::a("javascript:;", "<i class='icon icon-bars'></i>", "data-mode='list' class='mode-toggle btn'");?>
   </div>
   <?php extCommonModel::printLink('workflow', 'create', "type=flow&parent=&app=$currentApp",  "<i class='icon-plus'> </i>" . $lang->workflow->create, "class='btn btn-primary' data-toggle='modal'");?>
+  <?php extCommonModel::printLink('workflow', 'import', "",  "<i class='icon-plus'> </i>" . $lang->import, "class='btn btn-primary'");?>
 </div>
 <?php
 $canEdit = $this->workflow->isClickable(null, 'edit');

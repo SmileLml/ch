@@ -24,15 +24,18 @@ class flow extends control
      * @access public
      * @return void
      */
-    public function browse($mode = 'browse', $label = 0, $category = '', $orderBy = '', $recTotal = 0, $recPerPage = 20, $pageID = 1)
+    public function browse($mode = 'browse', $label = 0, $category = '', $orderBy = '', $recTotal = 0, $recPerPage = 15, $pageID = 1)
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
         $label  = (int)$label;
 
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        if($module == 'business' && empty($orderBy)) $orderBy = 'createdDate_desc';
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
         $this->flow->setSearchParams($flow, null, helper::createLink($flow->module, 'browse', "mode=bysearch&label=myQueryID"));
 
@@ -63,6 +66,7 @@ class flow extends control
 
         $browseLink = $this->createLink($module, 'browse', "mode=$mode&label=$label&category=$category&orderBy=$orderBy&recTotal=$recTotal&recPerPage=$recPerPage&pageID=$pageID");
         $this->session->set('flowList', $browseLink);
+        include $this->getHook('setfields');
 
         $this->view->dataList        = $dataList;
         $this->view->moduleMenu      = $this->flow->getModuleMenu($flow, $labels, $categories);
@@ -78,6 +82,8 @@ class flow extends control
         $this->view->categoryQuery   = $category;
         $this->view->orderBy         = $orderBy;
         $this->view->pager           = $pager;
+
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -94,20 +100,28 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
 
         if($step == 'save')
         {
+            //post点1
+            include $this->getHook('beforepost');
             $result = $this->flow->post($flow, $action, 0, $prevModule);
 
             $this->sendNotice($flow, $action, $result);
 
+            //post点2
+            include $this->getHook('afterpost');
             return $this->send($result);
         }
 
         $fields = $this->setFields($flow, $action);
+        include $this->getHook('fixfields');
 
         $this->setFlowData($flow, $action, 0, $prevModule, $prevDataID);
         $this->setFlowChild($flow->module, $action->action, $fields);
@@ -119,6 +133,8 @@ class flow extends control
         $this->view->actionURL     = $this->createLink($flow->module, 'create', "step=save&prevModule=$prevModule&prevDataID=$prevDataID");
         $this->view->formulaScript = $this->flow->getFormulaScript($flow->module, $action, $fields, $this->view->childFields);
         $this->view->linkageScript = $this->flow->getLinkageScript($action, $fields);
+        //get点2
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -135,20 +151,26 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
+
 
         if($step == 'save')
         {
+            include $this->getHook('beforepost');
             $result = $this->flow->batchPost($flow, $action);
 
             $this->sendNotice($flow, $action, $result);
 
+            include $this->getHook('afterpost');
             return $this->send($result);
         }
 
         $fields = $this->setFields($flow, $action);
+        include $this->getHook('fixfields');
 
         $this->setFlowData($flow, $action, 0, $prevModule, $prevDataID);
 
@@ -157,6 +179,8 @@ class flow extends control
         $this->view->users         = $this->loadModel('workflowaction', 'flow')->getUsers2Notice($flow->module);
         $this->view->actionURL     = $this->createLink($flow->module, $action->action, "step=save&prevModule=$prevModule&prevDataID=$prevDataID");
         $this->view->formulaScript = $this->flow->getFormulaScript($flow->module, $action, $fields);
+
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -171,21 +195,27 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
 
         if($_POST)
         {
+            include $this->getHook('beforepost');
             $result = $this->flow->post($flow, $action, $dataID);
 
             $this->sendNotice($flow, $action, $result);
+            include $this->getHook('afterpost');
 
             return $this->send($result);
         }
 
         $data   = $this->setFlowData($flow, $action, $dataID);
         $fields = $this->setFields($flow, $action, $data);
+        include $this->getHook('fixfields');
 
         $this->setFlowChild($flow->module, $action->action, $fields, $dataID);
         $this->flow->setFlowEditor($flow->module, 'edit', $fields);
@@ -196,6 +226,8 @@ class flow extends control
         $this->view->formulaScript = $this->flow->getFormulaScript($flow->module, $action, $fields, $this->view->childFields);
         $this->view->linkageScript = $this->flow->getLinkageScript($action, $fields);
         $this->view->referer       = helper::safe64Encode($this->server->http_referer);
+
+        include $this->getHook('display');
         $this->display('flow', 'operate');
     }
 
@@ -210,21 +242,55 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
 
         if($_POST or $action->open == 'none')
         {
+            include $this->getHook('beforepost');
             $result = $this->flow->post($flow, $action, $dataID);
 
             $this->sendNotice($flow, $action, $result);
+
+            include $this->getHook('afterpost');
+
+            // send openMessage
+            if(SX_ENABLE) {
+                $this->loadModel('apiRequest');
+                $this->loadModel('projectapproval');
+                $projectapproval   = $this->projectapproval->getByID($projectapprovalID);
+                $msgContent = sprintf("您有待审批的[项目管理]，请前往%s 进行确认。编号：%s ，主题： %s ，创建人：%s",$review_url,$projectapproval->name,$projectapproval->projectNumber,$_SESSION['user']->account);
+
+                if(is_array($_POST['approval_reviewer']) && count($_POST['approval_reviewer'])) {
+                    $reviewer_arr = array_pop($_POST['approval_reviewer']);
+                    foreach($reviewer_arr as $value) {
+                        if(!empty($value)) {
+                            try {
+                                $this->apiRequest->sendOpenMessage($value,$msgContent);
+                            } catch(Exception $e) {
+
+                            }
+
+                        }
+                    }
+                }
+            }
 
             return $this->send($result);
         }
 
         $data   = $this->setFlowData($flow, $action, $dataID);
         $fields = $this->setFields($flow, $action, $data);
+
+        if(isset($fields['reviewResult']) && $fields['reviewResult']->show == '1') $fields['reviewResult']->options = $this->flow->getReviewResultOptions($dataID, $flow, $fields['reviewResult']->options);
+
+        $data->reviewOpinion = '';
+
+        include $this->getHook('fixfields');
 
         $this->setFlowChild($flow->module, $action->action, $fields, $dataID);
         $this->flow->setFlowEditor($flow->module, 'operate', $fields);
@@ -236,7 +302,16 @@ class flow extends control
         $this->view->linkageScript = $this->flow->getLinkageScript($action, $fields);
         $this->view->referer       = helper::safe64Encode($this->server->http_referer);
         $this->view->dataID        = $dataID;
-        $this->display();
+
+        include $this->getHook('display');
+        if($action->action ==  'approvalreview5')
+        {
+            $this->display('projectapproval', 'finishSubmit');
+        }
+        else
+        {
+            $this->display();
+        }
     }
 
     /**
@@ -250,26 +325,34 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
+        include $this->getHook('checkpriv');
         $this->flow->checkPrivilege($flow, $action);
 
         if($step == 'save' or $action->open == 'none')
         {
+            include $this->getHook('beforepost');
             $result = $this->flow->batchPost($flow, $action);
 
             $this->sendNotice($flow, $action, $result);
 
+            include $this->getHook('afterpost');
             return $this->send($result);
         }
 
         $data   = $this->setFlowData($flow, $action);
         $fields = $this->setFields($flow, $action, $data);
+        include $this->getHook('fixfields');
 
         $this->view->notEmptyRule  = $this->loadModel('workflowrule', 'flow')->getByTypeAndRule('system', 'notempty');
         $this->view->users         = $this->loadModel('workflowaction', 'flow')->getUsers2Notice($flow->module);
         $this->view->actionURL     = $this->createLink($flow->module, $action->action, 'step=save');
         $this->view->formulaScript = $this->flow->getFormulaScript($flow->module, $action, $fields);
+
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -286,16 +369,21 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
         $data   = $this->setFlowData($flow, $action, $dataID);
         $fields = $this->setFields($flow, $action, $data);
+        include $this->getHook('fixfields');
 
+        include $this->getHook('checkpriv');
         $this->setFlowChild($flow->module, $action->action, $fields, $dataID);
         $this->flow->checkPrivilege($flow, $action);
 
         $blocks = json_decode($action->blocks);
         $processBlocks = $this->flow->processBlocks($blocks, $fields);
+        include $this->getHook('fixblocks');
 
         $this->view->processBlocks  = $processBlocks;
         $this->view->users          = $this->loadModel('user')->getDeptPairs('noletter');
@@ -306,6 +394,8 @@ class flow extends control
         $this->view->backLink       = $this->session->flowList;
         $this->view->currentType    = $linkType;
         $this->view->currentMode    = $mode;
+
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -320,15 +410,19 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
         $this->setFlowData($flow, $action, $dataID);
 
+        include $this->getHook('beforedelete');
         $this->dao->update($flow->table)->set('deleted')->eq('1')->where('id')->eq($dataID)->exec();
         $this->loadModel('action')->create($flow->module, $dataID, 'deleted', '', $extra = ACTIONMODEL::CAN_UNDELETED);
 
         if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
 
+        include $this->getHook('afterdelete');
         $url = $_SERVER['HTTP_REFERER'];
         $getPattern = $this->config->moduleVar . '=' . $module . '&' . $this->config->methodVar . '=view';
         $pathinfoPattern = $module . '-view-';
@@ -356,15 +450,20 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
         $this->setFlowData($flow, $action, $dataID);
 
         if($this->post->dataIDList)
         {
+            include $this->getHook('beforelink');
+
             $this->flow->link($flow, $dataID, $linkType, $this->post->dataIDList);
             if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
 
+            include $this->getHook('afterlink');
             $locate = $this->createLink($flow->module, 'view', "dataID=$dataID&linkType=$linkType");
             return $this->send(array('result' => 'success', 'locate' => $locate));
         }
@@ -375,14 +474,18 @@ class flow extends control
             die($this->fetch($linkType, 'link', "module=$module&dataID=$dataID&mode=$mode"));
         }
 
+
         $actionURL = $this->createLink($module, 'view', "dataID=$dataID&linkType=$linkType&mode=bysearch");
         $this->flow->setSearchParams($linkedFlow, $action, $actionURL);
+        include $this->getHook('setsearch');
 
         $unlinkedDatas = $this->flow->getUnlinkedDatas($module, $dataID, $linkedFlow, $mode);
 
         $this->view->linkedFields  = $this->workflowaction->getFields($linkedFlow->module, 'browse', true, $unlinkedDatas);
         $this->view->unlinkedDatas = $unlinkedDatas;
         $this->view->linkedFlow    = $linkedFlow;
+
+        include $this->getHook('display');
         $this->display();
     }
 
@@ -399,6 +502,8 @@ class flow extends control
     {
         $module = $this->app->rawModule;
         $action = $this->app->rawMethod;
+
+        include $this->getHook('input');
         list($flow, $action) = $this->setFlowAction($module, $action);
 
         $this->setFlowData($flow, $action, $dataID);
@@ -409,9 +514,13 @@ class flow extends control
 
         if($linkedIDList)
         {
+            include $this->getHook('beforeunlink');
             $this->flow->unlink($flow, $dataID, $linkType, $linkedIDList);
+            include $this->getHook('afterunlink');
             if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
         }
+
+        include $this->getHook('send');
 
         $locate = $this->createLink($flow->module, 'view', "dataID=$dataID&linkType=$linkType");
         return $this->send(array('result' => 'success', 'locate' => $locate));
@@ -621,8 +730,10 @@ class flow extends control
 
             if(isset($fields[$key]) && $fields[$key]->show)
             {
-                $childData = $this->flow->getDataList($childModule, '', 0, '', $dataID, 'id_asc');
+                $childData = [];
+                if($dataID) $childData = $this->flow->getDataList($childModule, '', 0, '', $dataID, 'id_asc');
 
+                 
                 $childFields[$key] = $this->workflowaction->getFields($childModule->module, $action, true, $childData);
                 $childDatas[$key]  = $childData;
             }
@@ -1218,7 +1329,7 @@ class flow extends control
             }
             if(in_array('reviewer', $node['types']))
             {
-                $html .= html::select('approval_reviewer[' . $node['id'] . '][]', array_diff($users, $reviewers), '', "multiple class='form-control chosen'");
+                $html .= html::select('approval_reviewer[' . $node['id'] . '][]', array_diff($users, $reviewers), '', "multiple class='form-control picker-select' data-drop_direction='down'");
                 if($reviewers) $html .= "<div class='otherReviewer' style='margin-top:10px'>" . $this->lang->approval->otherReviewer . join(',', $reviewers) . '</div>';
             }
             else
@@ -1246,7 +1357,7 @@ class flow extends control
 
             if(in_array('ccer', $node['types']))
             {
-                $html .= html::select('approval_ccer[' . $node['id'] . '][]', array_diff($users, $ccers), '', "multiple class='form-control chosen'");
+                $html .= html::select('approval_ccer[' . $node['id'] . '][]', array_diff($users, $ccers), '', "multiple class='form-control picker-select'");
                 if($ccers) $html .= "<div class='otherCcer' style='margin-top:10px'>" . $this->lang->approval->otherCcer . join(',', $ccers) . '</div>';
             }
             else
@@ -1262,5 +1373,22 @@ class flow extends control
         $html  .= '</tbody></table>';
 
         return print($html);
+    }
+
+    /**
+     * Load hook.
+     *
+     * @param  string $hook
+     * @access public
+     * @return void
+     */
+    public function getHook($hook)
+    {
+        $rawModule = $this->app->rawModule;
+        $rawMethod = $this->app->rawMethod;
+        $hookRoot  = $this->app->getExtensionRoot() . 'flowhooks' . DS;
+        $hookFile  = $hookRoot . $rawModule . DS . 'control' . DS . "{$rawMethod}.{$hook}.php";
+
+        return file_exists($hookFile) ? $hookFile : "{$hookRoot}null.php";
     }
 }

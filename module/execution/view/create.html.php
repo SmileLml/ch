@@ -64,6 +64,10 @@
           <td class="col-main"><?php echo html::select("project", $allProjects, $projectID, "class='form-control chosen' required onchange='refreshPage(this.value)'");?></td>
           <td colspan='2'></td>
         </tr>
+        <tr>
+          <th><?php echo $lang->execution->chteam;?></th>
+          <td colspan='3'><?php echo html::select('chteam[]', $chteam, '', "class='form-control picker-select' multiple required"); ?></td>
+        </tr>
         <?php if(!empty($project->model) and in_array($project->model, array('agileplus', 'ipd', 'waterfallplus'))):?>
         <?php if($project->model == 'agileplus' ) unset($lang->execution->typeList['stage']);?>
         <tr>

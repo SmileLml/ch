@@ -27,6 +27,14 @@
               }
           }
 
+          if($module == 'projectrole')
+          {
+              $currentModule = 'projectrole';
+              $method        = $key;
+              $params        = "";
+              $active        = (isset($type) and $type == $key) ? 'active' : $active;
+          }
+
           if(common::hasPriv($currentModule, $method)) echo html::a(inlink($method, $params), $value, '', "class='$active'");
       }
       ?>

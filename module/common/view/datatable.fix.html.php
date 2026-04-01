@@ -11,6 +11,7 @@ if($currentModule == 'project' && $currentMethod == 'bug') $showSwitchLink = fal
 if($currentModule == 'execution' && strpos(',all,task,bug,', ",{$currentMethod},") !== false) $showSwitchLink = false;
 if($currentModule == 'chproject' && strpos(',all,task,bug,', ",{$currentMethod},") !== false) $showSwitchLink = false;
 if($currentModule == 'bug' && $currentMethod == 'browse') $showSwitchLink = false;
+if($currentModule == 'yearplandemand' && $currentMethod == 'browse') $showSwitchLink = false;
 ?>
 
 <style>

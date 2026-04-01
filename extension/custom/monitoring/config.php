@@ -1,0 +1,2 @@
+<?php
+$config->monitoring->exportFields = 'projectNumber,projectName,projectpri,responsibleDept,businessPM,businessDept,itPM,productManager,itDevM,beginDate,projectReviewDate,businessID,businessTitle,businessStatus,PRDdate,PRDconfirmDate,PRDWarning,goLiveDate,goLiveConfirmDate,goLiveWarning,acceptanceDate,acceptanceConfirmDate,acceptanceWarning,terminationDate,terminationConfirmDate,terminationWarning';

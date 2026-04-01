@@ -62,6 +62,7 @@ class myStory extends story
         if($this->post->comments)
         {
             $data       = fixer::input('post')->get();
+            $this->story->changeRequirementStatusByStoryStage($_POST['storyIdList']);
             $allChanges = $this->story->batchClose();
 
             if($allChanges)

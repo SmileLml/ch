@@ -51,6 +51,7 @@ class chprojectModel extends model
      */
     public function getStatData($teamID = 0, $intanceProjectID = 0, $browseType = 'undone', $param = '', $orderBy = 'id_asc', $pager = null)
     {
+        $this->loadModel('user');
         $executionIDList = [];
         if($intanceProjectID)
         {
@@ -66,6 +67,11 @@ class chprojectModel extends model
         $projectIDList = [];
         if(in_array($browseType, ['undone', 'wait', 'doing', 'suspended', 'closed'])) $projectIDList = $this->getIntanceByStatus($browseType, $executionIDList);
 
+        $currentUser           = $this->app->user->account;
+        $PMOUsers              = $this->user->getUsersByUserGroupName($this->lang->chproject->group->PMO);
+        $QAUsers               = $this->user->getUsersByUserGroupName($this->lang->chproject->group->QA);
+        $seniorExecutiveUsers  = $this->user->getUsersByUserGroupName($this->lang->chproject->group->seniorExecutive);
+
         $executions = $this->dao->select('t1.*')->from(TABLE_CHPROJECT)->alias('t1')
             ->leftJoin(TABLE_CHPROJECTTEAM)->alias('t2')->on('t1.id = t2.project')
             ->where('type')->in('sprint,stage,kanban')
@@ -74,7 +80,7 @@ class chprojectModel extends model
             ->andWhere('vision')->eq($this->config->vision)
             ->andWhere('multiple')->eq('1')
             ->andWhere('grade')->eq('1')
-            ->beginIF(!$this->app->user->admin)->andWhere('t1.id')->in($projects)->fi()
+            ->beginIF(!$this->app->user->admin && !isset($seniorExecutiveUsers[$currentUser]) && !isset($PMOUsers[$currentUser]) && !isset($QAUsers[$currentUser]))->andWhere('t1.id')->in($projects)->fi()
             ->beginIF($intanceProjectID)->andWhere('t1.id')->in($executionIDList)->fi()
             ->beginIF(in_array($browseType, ['undone', 'wait', 'doing', 'suspended', 'closed']))->andWhere('t1.id')->in($projectIDList)->fi()
             ->beginIF($browseType == 'undone')->andWhere('status')->notIN('done,closed')->fi()
@@ -448,16 +454,20 @@ class chprojectModel extends model
     {
         $this->app->loadLang('execution');
 
-        $statusList = $this->dao->select('id,status')->from(TABLE_EXECUTION)->where('id')->in($intances)->fetchPairs();
+        $statusList      = $this->dao->select('id,status')->from(TABLE_EXECUTION)->where('id')->in($intances)->fetchPairs();
+        $statusCountList = array_count_values($statusList);
+        $statusCount     = count($statusList);
 
-        if(in_array('doing', $statusList)) return 'doing';
+        if(array_key_exists('wait',      $statusCountList) && $statusCountList['wait']      == $statusCount) return 'wait';
+        if(array_key_exists('closed',    $statusCountList) && $statusCountList['closed']    == $statusCount) return 'closed';
+        if(array_key_exists('suspended', $statusCountList) && $statusCountList['suspended'] == $statusCount) return 'suspended';
 
-        foreach($this->lang->execution->statusList as $status => $statusName)
+        if(array_key_exists('suspended', $statusCountList) && array_key_exists('wait', $statusCountList) && ($statusCountList['suspended'] + $statusCountList['wait'] == $statusCount))
         {
-            if(in_array($status, $statusList)) return $status;
+             return 'suspended';
         }
 
-        return '';
+        return 'doing';
     }
 
     /**
@@ -557,7 +567,7 @@ class chprojectModel extends model
         }
         elseif($module == 'bug' && strpos(',view,edit,', ",$method,") !== false)
         {
-            $link = helper::createLink('chproject', 'bug', "projectID=%s") . '#app=chteam';
+            $link = helper::createLink('chproject', 'bug', "projectID=%s&intanceProjectID=0&productID=0&branch=all&orderBy=&build=&type=bysearch&param=myQueryID") . '#app=chteam';
         }
         elseif($module == 'bug' && $method == 'create')
         {
@@ -609,6 +619,10 @@ class chprojectModel extends model
         elseif($module == 'execution' && in_array($method, array('linkstory', 'story')))
         {
             $link = helper::createLink('chproject', 'story', "projectID=%s");
+        }
+        elseif($module == 'chproject' && $method == 'bug')
+        {
+            $link = helper::createLink('chproject', 'bug', "projectID=%s&intanceProjectID=0&productID=0&branch=all&orderBy=&build=&type=bysearch&param=myQueryID") . '#app=chteam';
         }
 
         return $link;

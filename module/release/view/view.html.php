@@ -110,7 +110,7 @@
                     </td>
                     <td class='c-build' title='<?php echo $story->buildName?>'><?php echo $story->buildName?></td>
                     <td class='c-user'><?php echo zget($users, $story->openedBy);?></td>
-                    <td class='c-estimate' title="<?php echo $story->estimate . ' ' . $lang->hourCommon;?>"><?php echo $story->estimate . $config->hourUnit;?></td>
+                    <td class='c-estimate' title="<?php echo $story->estimate . ' ' . $lang->story->day;?>"><?php echo $story->estimate . $lang->story->day;?></td>
                     <td class='c-stage'><?php echo $lang->story->stageList[$story->stage];?></td>
                     <td class='c-actions'>
                       <?php

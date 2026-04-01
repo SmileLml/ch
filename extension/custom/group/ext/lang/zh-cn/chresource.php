@@ -27,3 +27,23 @@ $lang->resource->chproject->gantt      = 'gantt';
 $lang->resource->chproject->grouptask  = 'grouptask';
 $lang->resource->chproject->tree       = 'tree';
 $lang->resource->chproject->taskeffort = 'taskeffort';
+
+$lang->resource->task->batchChangeStory = 'batchChangeStory';
+
+$lang->group->monitoring = '项目过程监控';
+
+$lang->group->package->browseMonitoring = '浏览监控';
+
+$lang->resource->monitoring = new stdclass();
+$lang->resource->monitoring->browse = 'browse';
+$lang->resource->monitoring->export = 'export';
+
+$lang->group->diff = '版本对比';
+
+$lang->resource->diff = new stdclass();
+$lang->resource->diff->index = 'index';
+
+$lang->resource->task->batchChangeExecution = 'changeProject';
+
+$lang->resource->testcase->batchClone = 'batchClone';
+$lang->resource->testcase->syncEdit   = 'syncEdit';

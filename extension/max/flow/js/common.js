@@ -2,7 +2,7 @@ $(document).ready(function()
 {
     if(typeof window.moduleName !== 'undefined' && (typeof(openInModal) == 'undefined' || openInModal != true))
     {
-        $('#navbar .nav li').removeClass('active');
+        if(window.moduleName !== 'business') $('#navbar .nav li').removeClass('active');
         if(config.requestType == 'GET')
         {
             $('#navbar .nav li a[href*="index\\.php\\?' + config.moduleVar + '\\=' + window.moduleName + '\\&' + config.methodVar + '\\=browse"]').parent('li').addClass('active');

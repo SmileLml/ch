@@ -1,24 +1,27 @@
 <?php
 $config->workflowdatasource->methods = array();
-$config->workflowdatasource->methods['branch']      = array('getPairs');
-$config->workflowdatasource->methods['bug']         = array('getUserBugPairs', 'getProductBugPairs', 'getBugInfoFromResult');
-$config->workflowdatasource->methods['build']       = array('getBuildPairs');
-$config->workflowdatasource->methods['dept']        = array('getOptionMenu', 'getAllChildID', 'getDeptUserPairs');
-$config->workflowdatasource->methods['group']       = array('getPairs', 'getUserPairs');
-$config->workflowdatasource->methods['message']     = array('getObjectTypes');
-$config->workflowdatasource->methods['product']     = array('getPairs', 'getTeamMemberPairs');
-$config->workflowdatasource->methods['productplan'] = array('getPairs', 'getPairsForStory', 'getForProducts');
-$config->workflowdatasource->methods['program']     = array('getPairs', 'getProductPairs');
-$config->workflowdatasource->methods['project']     = array('getPairsByProgram', 'getPairsByModel');
-$config->workflowdatasource->methods['execution']   = array('getPairs', 'getTeams2Import');
-$config->workflowdatasource->methods['search']      = array('getQueryPairs');
-$config->workflowdatasource->methods['story']       = array('getProductStoryPairs', 'getExecutionStoryPairs', 'getUserStoryPairs', 'getVersions');
-$config->workflowdatasource->methods['task']        = array('getParentTaskPairs', 'getUserTaskPairs', 'getMemberPairs');
-$config->workflowdatasource->methods['testcase']    = array('getStoryCaseCounts');
-$config->workflowdatasource->methods['caselib']     = array('getLibraries');
-$config->workflowdatasource->methods['testtask']    = array('getRelatedTestTasks');
-$config->workflowdatasource->methods['tree']        = array('getOptionMenu', 'getModulePairs', 'getTaskOptionMenu', 'getTaskTreeModules', 'getAllChildID', 'getProjectModule', 'getModulesName');
-$config->workflowdatasource->methods['user']        = array('getPairs', 'getCommiters', 'getUserRoles', 'getGroups', 'getContactLists', 'getListByAccount', 'getContactUserPairs', 'getTeamMemberPairs');
+$config->workflowdatasource->methods['branch']          = array('getPairs');
+$config->workflowdatasource->methods['syncprocess']     = array('getAllNameProcess');
+$config->workflowdatasource->methods['bug']             = array('getUserBugPairs', 'getProductBugPairs', 'getBugInfoFromResult');
+$config->workflowdatasource->methods['build']           = array('getBuildPairs');
+$config->workflowdatasource->methods['dept']            = array('getOptionMenu', 'getAllChildID', 'getDeptUserPairs');
+$config->workflowdatasource->methods['group']           = array('getPairs', 'getUserPairs');
+$config->workflowdatasource->methods['message']         = array('getObjectTypes');
+$config->workflowdatasource->methods['product']         = array('getPairs', 'getTeamMemberPairs');
+$config->workflowdatasource->methods['productplan']     = array('getPairs', 'getPairsForStory', 'getForProducts');
+$config->workflowdatasource->methods['program']         = array('getPairs', 'getProductPairs');
+$config->workflowdatasource->methods['project']         = array('getPairsByProgram', 'getPairsByModel', 'getPairsByPM');
+$config->workflowdatasource->methods['execution']       = array('getPairs', 'getTeams2Import');
+$config->workflowdatasource->methods['search']          = array('getQueryPairs');
+$config->workflowdatasource->methods['story']           = array('getProductStoryPairs', 'getExecutionStoryPairs', 'getUserStoryPairs', 'getVersions');
+$config->workflowdatasource->methods['task']            = array('getParentTaskPairs', 'getUserTaskPairs', 'getMemberPairs');
+$config->workflowdatasource->methods['testcase']        = array('getStoryCaseCounts');
+$config->workflowdatasource->methods['caselib']         = array('getLibraries');
+$config->workflowdatasource->methods['testtask']        = array('getRelatedTestTasks');
+$config->workflowdatasource->methods['tree']            = array('getOptionMenu', 'getModulePairs', 'getTaskOptionMenu', 'getTaskTreeModules', 'getAllChildID', 'getProjectModule', 'getModulesName');
+$config->workflowdatasource->methods['user']            = array('getPairs', 'getCommiters', 'getUserRoles', 'getGroups', 'getContactLists', 'getListByAccount', 'getContactUserPairs', 'getTeamMemberPairs');
+$config->workflowdatasource->methods['demand']          = array('getDemandMenuForBusiness');
+$config->workflowdatasource->methods['projectapproval'] = array('getProjectapprovalBusiness');
 
 $config->workflowdatasource->langList = array();
 $config->workflowdatasource->langList['bugSeverity']   = array('module' => 'bug', 'field' => 'severityList');
@@ -78,3 +81,10 @@ $config->workflowdatasource->langList['feedbackSolution']     = array('module' =
 $config->workflowdatasource->langList['feedbackclosedReason'] = array('module' => 'feedback', 'field' => 'closedReasonList');
 
 $config->workflowdatasource->langList['storyClosedReason'] = array('module' => 'story', 'field' => 'reasonList');
+
+$config->workflowdatasource->langList['demandpoolStatus'] = array('module' => 'demandpool', 'field' => 'statusList');
+
+$config->workflowdatasource->langList['demandCategory'] = array('module' => 'demand', 'field' => 'categoryList');
+$config->workflowdatasource->langList['demandSource']   = array('module' => 'demand', 'field' => 'sourceList');
+$config->workflowdatasource->langList['demandStatus']   = array('module' => 'demand', 'field' => 'statusList');
+$config->workflowdatasource->langList['demandStage']    = array('module' => 'demand', 'field' => 'stageList');

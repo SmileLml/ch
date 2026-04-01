@@ -26,6 +26,10 @@ class flowProduct extends productModel
         if($module == 'chproject' && in_array($method, array('bug', 'testcase')))
         {
             $params = explode(',', $extra);
+            if($method == 'bug')
+            {
+                return helper::createLink($module, $method, "projectID={$this->session->chproject}&intanceProjectID={$this->session->intanceProjectID}&productID=%s" . ($branch ? "&branch=%s&orderBy=&build=&type=bysearch&param=myQueryID" : '&branch=all&orderBy=&build=&type=bysearch&param=myQueryID'));
+            }
             return helper::createLink($module, $method, "projectID={$this->session->chproject}&intanceProjectID={$this->session->intanceProjectID}&productID=%s" . ($branch ? "&branch=%s" : ''));
         }
 

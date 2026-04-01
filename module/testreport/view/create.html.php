@@ -90,7 +90,10 @@
             </tr>
             <tr>
               <th><?php echo $lang->testreport->report?></th>
-              <td colspan='2'><?php echo html::textarea('report', '', "class='form-control'")?></td>
+              <td colspan='2'>
+                <?php echo $this->fetch('user', 'ajaxPrintTemplates', 'type=testreport&link=report');?>
+                <?php echo html::textarea('report', '', "class='form-control'")?>
+              </td>
               <td></td>
             </tr>
             <tr>

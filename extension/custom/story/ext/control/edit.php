@@ -22,11 +22,53 @@ class myStory extends story
 
         if(!empty($_POST))
         {
+            if($_POST['business'])
+            {
+                $linkProject = $this->dao->select('project')->from('zt_projectstory')->where('story')->eq($storyID)->fetchAll();
+                $projectIds  =  array_map(function($projectID)
+                {
+                    return $projectID->project;
+                }, $linkProject);
+                $business    = $this->dao->select('*')->from('zt_flow_projectbusiness')->where('project')->in($projectIds)->andWhere('business')->eq($_POST['business'])->andWhere('deleted')->eq(0)->fetch();
+                if(!helper::isZeroDate($business->goLiveDate))
+                {
+                    if($_POST['planonlinedate'] && $_POST['planonlinedate'] > $business->goLiveDate) return $this->send(array('result' => 'fail', 'message' => $this->lang->story->planonlinedateover));
+                }
+            }
+            if($storyType == 'requirement')
+            {
+                list($result, $message) = $this->story->checkBusinessResidueEstimate($_POST['business'], $storyID, 'edit', $_POST['estimate']);
+
+            }
+            else
+            {
+                list($result, $message) = $this->story->checkRequirementResidueEstimateForStory($storyID, $_POST['estimate']);
+            }
+            if(!$result) return print(js::error($message));
+            if($storyType == 'story')
+            {
+                $result = $this->story->taskEstimateIsExceed($storyID, $_POST['estimate']);
+                if(!$result) return print(js::error($this->lang->story->taskEstimateExceedError));
+            }
             $this->story->update($storyID);
             if(dao::isError())
             {
                 if(defined('RUN_MODE') && RUN_MODE == 'api') return $this->send(array('result' => 'fail', 'message' => dao::getError()));
                 return print(js::error(dao::getError()));
+            }
+            if($storyType == 'story') $this->story->changeRequirementStatusByStoryStage(array($storyID));
+            if($_POST['business'])
+            {
+                if(helper::isZeroDate($business->goLiveDate) || helper::isZeroDate($business->acceptanceDate))
+                {
+                    if(!empty($_POST['planonlinedate']))
+                    {
+                        $projectapprovalID = $this->dao->select('parent')->from('zt_flow_projectbusiness')->where('business')->eq($_POST['business'])->andWhere('deleted')->eq(0)->fetch('parent');
+                        $this->story->updateBusinessDate($projectapprovalID, $projectIds, $_POST['business'], $_POST['planonlinedate'], $business);
+                    }
+                }
+
+                $this->story->updateBusinessStatusToPortionPRD($_POST['business']);
             }
 
             $this->executeHooks($storyID);
@@ -149,6 +191,15 @@ class myStory extends story
 
         $branch         = $product->type == 'branch' ? ($story->branch > 0 ? $story->branch : '0') : 'all';
         $productStories = $this->story->getProductStoryPairs($story->product, $branch, 0, 'all', 'id_desc', 0, '', $story->type);
+
+        if(($this->app->tab == 'project' or $this->app->tab == 'product') && $storyType == 'requirement')
+        {
+            $projectID = $this->dao->select('project')->from('zt_projectstory')->where('story')->eq($story->id)->orderBy('project_desc')->fetch('project');
+            $business  = array(0 => '');
+            $business  += $this->project->getBusinessPairs($projectID, 'story');
+            $business  += $this->dao->select('id, name')->from('zt_flow_business')->where('id')->eq($story->business)->fetchPairs('id');
+            $this->view->business = $business;
+        }
 
         if($story->type == 'requirement') $this->lang->story->notice->reviewerNotEmpty = str_replace($this->lang->SRCommon, $this->lang->URCommon, $this->lang->story->notice->reviewerNotEmpty);
 

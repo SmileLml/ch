@@ -30,6 +30,12 @@ class mytestcase extends testcase
             $changes = array();
             if($comment == false or $comment == 'false')
             {
+                if(isset($_POST['isSync']))
+                {
+                    $isSync = $_POST['isSync'];
+                    unset($_POST['isSync']);
+                }
+
                 $changes = $this->testcase->update($caseID, $testtasks);
                 if(dao::isError()) return print(js::error(dao::getError()));
             }
@@ -43,6 +49,44 @@ class mytestcase extends testcase
                 if($case->status != 'wait' and $this->post->status == 'wait') $this->action->create('case', $caseID, 'submitReview');
             }
 
+            if($isSync)
+            {
+                $this->loadModel('action');
+                unset($_POST['product']);
+                unset($_POST['story']);
+                unset($_POST['linkCase']);
+                unset($_POST['linkBug']);
+                if($case->fromCaseID)
+                {
+                    $fromCase                 = $this->testcase->getById($case->fromCaseID);
+                    $_POST['lib']             = $fromCase->lib;
+                    $_POST['lastEditedDate']  = $fromCase->lastEditedDate;
+
+                    $fromTesttasks = $this->loadModel('testtask')->getGroupByCases($case->fromCaseID);
+                    $fromTesttasks = empty($fromTesttasks[$case->fromCaseID]) ? array() : $fromTesttasks[$case->fromCaseID];
+
+                    $changes  = $this->testcase->update($case->fromCaseID, $fromTesttasks);
+                    $changes  = $this->testcase->syncFileForLibLinkCase($caseID, $case->fromCaseID, $changes);
+                    if(dao::isError()) return print(js::error(dao::getError()));
+                    $actionID = $this->action->create('case', $case->fromCaseID, 'syncLib', '', $_POST['title'] . ':' . $caseID);
+                    $this->action->logHistory($actionID, $changes);
+                }
+                $toCases = $this->dao->select('*')->from(TABLE_CASE)->where('fromCaseID')->eq($caseID)->fetchAll();
+                foreach($toCases as $toCase)
+                {
+                    $_POST['lib']            = $toCase->lib;
+                    $_POST['lastEditedDate'] = $toCase->lastEditedDate;
+
+                    $toTesttasks  = $this->loadModel('testtask')->getGroupByCases($toCase->id);
+                    $toTesttasks  = empty($toTesttasks[$toCase->id]) ? array() : $toTesttasks[$toCase->id];
+                    $changes      = $this->testcase->update($toCase->id, $toTesttasks);
+                    $changes      = $this->testcase->syncFileForLibLinkCase($caseID, $toCase->id, $changes);
+                    if(dao::isError()) return print(js::error(dao::getError()));
+                    $actionID = $this->action->create('case', $toCase->id, 'syncLib', '', $_POST['title'] . ':' . $caseID);
+                    $this->action->logHistory($actionID, $changes);
+                }
+            }
+
             $this->executeHooks($caseID);
 
             if(defined('RUN_MODE') && RUN_MODE == 'api')
@@ -51,7 +95,10 @@ class mytestcase extends testcase
             }
             else
             {
-                return print(js::locate($this->createLink('testcase', 'view', "caseID=$caseID"), 'parent'));
+                $locate = $this->createLink('testcase', 'view', "caseID=$caseID");
+
+                if($chprojectID) $locate = $this->createLink('testcase', 'view', "caseID=$caseID&version=$case->version&from=testcase&taskID=0&chprojectID=$chprojectID");
+                return print(js::locate($locate, 'parent'));
             }
         }
 
@@ -85,9 +132,12 @@ class mytestcase extends testcase
             $product    = $this->product->getById($productID);
             if($this->app->tab == 'chteam')
             {
-                $executionID = $executionID ? $executionID : $case->execution;
-                $products    = $this->loadModel('chproject')->getIntanceProductsPairs($chprojectID, true);
-                $execution   = $this->loadModel('execution')->getByID($executionID);
+                $this->loadModel('chproject');
+                $intances       = $this->chproject->getIntances($chprojectID);
+                $linkExecutions = $this->chproject->getCaseExecution($case, $intances);
+                $executionID    = $executionID ? $executionID : reset($linkExecutions);
+                $products       = $this->loadModel('chproject')->getIntanceProductsPairs($chprojectID, true);
+                $execution      = $this->loadModel('execution')->getByID($executionID);
                 if(!$execution->hasProduct || !isset($products[$productID]))
                 {
                     $productID = $this->product->getProductIDByProject($execution->id);
@@ -175,7 +225,17 @@ class mytestcase extends testcase
                 $stories = $this->story->getProductStoryPairs($case->product, $case->branch, 0, $storyStatus, 'id_desc', 0, 'full', 'story', false);
             }
 
-            if($this->app->tab == 'chteam') $stories = $this->story->getExecutionStoryPairs($executionID, $productID, $case->branch, $moduleIdList);
+            if($this->app->tab == 'chteam')
+            {
+                $story   = $this->story->getById($case->story);
+                $stories = $this->story->getExecutionStoryPairs($executionID, $productID, $case->branch, $moduleIdList);
+
+                if(!isset($stories[$case->story]))
+                {
+                    $storyPairs = $this->story->formatStories([$story]);
+                    $stories[$case->story] = $storyPairs[$case->story];
+                }
+            }
 
             if($this->app->tab == 'chteam')
             {

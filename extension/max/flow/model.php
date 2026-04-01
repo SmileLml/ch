@@ -2014,7 +2014,6 @@ EOT;
             ->remove('file,children,approval_reviewer,approval_ccer')
             ->removeIF($action->position == 'menu', 'dataID')
             ->get();
-
         /* Remove files and labels field when uploading files. */
         foreach($data as $fieldName => $fieldValue)
         {
@@ -2045,6 +2044,10 @@ EOT;
             }
 
             if(strpos(',multi-select,checkbox,radio,', ",{$field->type},") !== false && !isset($data->{$field->field})) $data->{$field->field} = in_array($field->type, $this->config->workflowfield->numberTypes) ? 0 : '';
+        }
+        if($flow->module == 'projectapproval')
+        {
+            $oldBusiness = $this->dao->select('business')->from('zt_flow_projectbusiness')->where('parent')->eq($dataID)->andWhere('deleted')->eq(0)->fetchPairs('business');
         }
 
         $result = $this->operate($flow, $action, $fields, $editorFields, $data, $dataID);
@@ -2093,11 +2096,69 @@ EOT;
         /* Create action. */
         $actionID = 0;
         if($action->method == 'create') $actionID = $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, $action->action, $fileAction);
-        if($action->method != 'create' && (strpos(',approvalsubmit,approvalcancel,approvalreview,', ',' . $action->action . ',') === false) && (!empty($result['changes']) or $fileAction))
+
+        $isApproval = (strpos($action->action, 'approvalsubmit') === false) || (strpos($action->action, 'approvalcancel') === false) || (strpos($action->action, 'approvalreview') === false);
+        if($action->method != 'create' && $isApproval && (!empty($result['changes']) or ($fileAction && $action->action != 'projectchange') or ($flow->module == 'projectapproval' && $this->session->isProjectapprovalChange)))
         {
             $actionID = $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, $action->action, $fileAction);
+
+            $childChanges = array();
+            if(($flow->module == 'projectapproval' && (strpos($action->action, 'approvalcancel') === false && strpos($action->action, 'approvalreview') === false && strpos($action->action, 'uploadfiles') === false)) or ($flow->module == 'business' && ((strpos($action->action, 'approvalcancel') === false) && (strpos($action->action, 'approvalreview') === false) && (strpos($action->action, 'prdsubmit') === false) && (strpos($action->action, 'prdcancel') === false) && (strpos($action->action, 'prdreview') === false) && (strpos($action->action, 'uploadfiles') === false))))
+            {
+                if($action->action == 'changechstatus')
+                {
+                    $this->loadModel('flow')->mergeVersionByObjectType($dataID, $flow->module);
+                }
+                else
+                {
+                    $oldVersion = $this->dao->select('version')->from('zt_flow_'.$flow->module)->where('id')->eq($dataID)->fetch('version');
+                    $version    = $oldVersion + 1;
+
+                    $this->dao->update('zt_flow_'.$flow->module)->set('version')->eq($version)->where('id')->eq($dataID)->exec();
+
+                    $result['changes'][] = ['field' => 'version', 'old' => $oldVersion, 'new' => $version];
+
+                    if($flow->module == 'projectapproval' && ($action->action == 'approvalsubmit3' || $action->action == 'approvalsubmit4')) $this->loadModel('flow')->updateBusinessByProjectChange($dataID);
+
+                    $this->loadModel('flow')->createVersionByObjectType($dataID, $flow->module);
+                    if($flow->module == 'projectapproval') $this->flow->createChildHistory($dataID, $actionID, $oldVersion, $version);
+                }
+            }
+
+            $businessRollback = ($flow->module == 'business' && ((strpos($action->action, 'approvalcancel') !== false) || ((strpos($action->action, 'approvalreview') !== false) && $data->reviewResult == 'reject'))) ? true : false;
+            $projectRollback  = ($flow->module == 'projectapproval' && ((strpos($action->action, 'approvalcancel') !== false) || ((strpos($action->action, 'approvalreview') !== false) && in_array($data->reviewResult, ['reject', 'adjust'])))) ? true : false;
+            $projectClose     = ($flow->module == 'projectapproval' && ((in_array($action->action, ['approvalreview1', 'approvalreview2', 'evaluationfeedback'])) && ($data->reviewResult == 'reject'))) ? true : false;
+
+            if($projectClose)
+            {
+                $projectRollback = false;
+                $this->loadModel('projectapproval')->updateBusinessStatusToDeclined($data->id);
+            }
+
+            if($businessRollback || $projectRollback)
+            {
+                $oldVersion = $this->dao->select('version')->from('zt_flow_'.$flow->module)->where('id')->eq($dataID)->fetch('version');
+                $version    = $oldVersion - 1;
+                $this->dao->update('zt_flow_'.$flow->module)->set('version')->eq($version)->where('id')->eq($dataID)->exec();
+                $result['changes'][] = ['field' => 'version', 'old' => $oldVersion, 'new' => $version];
+                if($flow->module == 'projectapproval') $this->loadModel('flow')->createChildHistory($dataID, $actionID, $oldVersion, $version);
+
+                $this->loadModel('flow')->rollbackVersionByObjectType($dataID, $flow->module, $action->action);
+            }
+
+            if($flow->module == 'projectapproval' and in_array($action->action, array('approvalsubmit1', 'approvalsubmit2', 'approvalsubmit3', 'approvalsubmit4', 'edit')))
+            {
+                $newBusiness = $this->dao->select('business')->from('zt_flow_projectbusiness')->where('parent')->eq($dataID)->andWhere('deleted')->eq(0)->fetchPairs('business');
+
+                $oldBusinessKey = array_keys($oldBusiness);
+                $newBusinessKey = array_keys($newBusiness);
+
+                if(array_diff($oldBusinessKey, $newBusinessKey) || array_diff($newBusinessKey, $oldBusinessKey)) $result['changes'][] = ['field' => $this->lang->flow->businessDiff, 'old' => implode(',', $oldBusinessKey), 'new' => implode(',', $newBusinessKey)];
+            }
+
             $this->action->logHistory($actionID, $result['changes']);
         }
+        $this->session->set('isProjectapprovalChange', '');
 
         $message = !empty($result['message']) ? $result['message'] : $this->lang->saveSuccess;
         if($action->open == 'none') return array('result' => 'success', 'recordID' => $dataID, 'actionID' => $actionID);
@@ -2366,6 +2427,8 @@ EOT;
     public function update($flow, $action, $fields, $data, $skip, $dataID)
     {
         $oldData = $this->getDataByID($flow, $dataID, $decode = false);
+        if($flow->module == 'projectapproval' && $action->action == 'approvalsubmit3') $oldData->changeType = '';
+
         $account = $this->app->user->account;
         $now     = helper::now();
 
@@ -2469,43 +2532,116 @@ EOT;
             if(!$canExec) return array('result' => 'fail', 'message' => !empty($action->verifications->message) ? $action->verifications->message : $this->lang->fail);
         }
 
-        if(!empty($this->config->openedApproval) && $flow->approval == 'enabled' && strpos(',approvalsubmit,approvalcancel,approvalreview,', ",{$action->action},") !== false)
+        $actionID   = 0;
+        $isApproval = (strpos($action->action, 'approvalsubmit') !== false) || (strpos($action->action, 'approvalcancel') !== false) || (strpos($action->action, 'approvalreview') !== false);
+        if(!empty($this->config->openedApproval) && $flow->approval == 'enabled' && $isApproval)
         {
             /* Log first for approval send message. */
             $actionID = $this->loadModel('action')->create(zget($this->config->flow->realModule, $flow->module), $dataID, $action->action);
+            $changes  = common::createChanges($oldData, $data);
+            if($changes) $this->action->logHistory($actionID, $changes);
 
-            $approval = $action->action;
-            $result   = $this->$approval($flow, $data, $dataID);
+            if(strpos($action->action, 'approvalsubmit') !== false) $approval = 'approvalsubmit';
+            if(strpos($action->action, 'approvalcancel') !== false) $approval = 'approvalcancel';
+            if(strpos($action->action, 'approvalreview') !== false) $approval = 'approvalreview';
+
+            $result = $this->$approval($flow, $data, $dataID, $action->action);
 
             if(isset($result['result']) && $result['result'] == 'fail') return $result;
         }
 
-        $dao = $this->dao->update("`$flow->table`")->data($data, $skip);
-        $dao = $this->checkRules($fields, $data, $dao);
-        $dao->where('id')->eq($dataID)->autoCheck()->exec();
-        if(dao::isError()) return false;
+        if($flow->module == 'projectapproval' && $action->action == 'approvalsubmit3') $data->oldStatus = $oldData->status;
 
-        /* Update the children data. */
-        if($this->post->children)
+        $version = '';
+        if($flow->module == 'projectapproval' || $flow->module == 'business')
         {
-            $postData = fixer::input('post')->get();
-            $errors   = $this->updateChildrenData($flow, $action, $postData->children, $dataID);
-            if($errors)
-            {
-                foreach($fields as $field) if($field->control === 'file') unset($oldData->{$field->field . 'files'});
-                $this->dao->update($flow->table)->data($oldData)->where('id')->eq($dataID)->exec();
-
-                dao::$errors = $errors;
-                return false;
-            }
+            $version = $data->version;
+            unset($data->version);
         }
 
-        $message = $this->workflowhook->execute($flow, $action, $dataID);
-        if(dao::isError()) return false;
+        $dao = $this->dao->update("`$flow->table`")->data($data, $skip);
 
-        unset(dao::$cache[$flow->table]);
+        $dao = $this->checkRules($fields, $data, $dao);
+        if($action->module == 'business' && $action->action == 'projectchange')
+        {
+            $dao->where('id')->eq($dataID)->autoCheck();
+            if(dao::isError())
+            {
+                //删除在校验之前创建的历史记录.
+                $err = dao::getError();
+                if($isApproval && $actionID) $this->dao->delete()->from(TABLE_ACTION)->where('id')->eq($actionID)->exec();
+                dao::$errors = $err;
+                return false;
+            }
+
+            $data->business = $data->id;
+            $data->version  = $version;
+
+            unset($data->id);
+            unset($data->editedBy);
+            unset($data->editedDate);
+            unset($data->projectchangeBy);
+            unset($data->projectchangeDate);
+            $changes  = common::createChanges($oldData, $data);
+            if(count($changes) == 1)
+            {
+                foreach($changes as $changeValue) if($changeValue['field'] != 'isCancel') $data->version = $data->version + 1;
+
+            }
+            elseif(count($changes) > 1)
+            {
+                $data->version = $data->version + 1;
+            }
+
+            $data->operator = $this->app->user->account;
+
+            $copyBusiness = $this->dao->select('id')->from('zt_copyflow_business')->where('project')->eq($data->project)->andWhere('business')->eq($data->business)->andWhere('operator')->eq($data->operator)->limit(1)->fetch('id');
+            if(empty($copyBusiness))  $this->dao->insert('zt_copyflow_business')->data($data)->exec();
+            if(!empty($copyBusiness)) $this->dao->update('zt_copyflow_business')->data($data)->where('id')->eq($copyBusiness)->exec();
+
+            if($data->isCancel == 'Y') $this->dao->update('zt_flow_projectapproval')->set('businessCancel')->eq('Y')->where('id')->eq($data->project)->exec();
+        }
+        else
+        {
+            $dao->where('id')->eq($dataID)->autoCheck()->exec();
+            if(dao::isError())
+            {
+                //删除在校验之前创建的历史记录.
+                $err = dao::getError();
+                if($isApproval && $actionID) $this->dao->delete()->from(TABLE_ACTION)->where('id')->eq($actionID)->exec();
+                dao::$errors = $err;
+                return false;
+            }
+
+            /* Update the children data. */
+            if($this->post->children)
+            {
+                $postData = fixer::input('post')->get();
+                $errors   = $this->updateChildrenData($flow, $action, $postData->children, $dataID);
+                if($errors)
+                {
+                    foreach($fields as $field) if($field->control === 'file') unset($oldData->{$field->field . 'files'});
+                    $this->dao->update($flow->table)->data($oldData)->where('id')->eq($dataID)->exec();
+
+                    dao::$errors = $errors;
+                    return false;
+                }
+            }
+
+            $message = $this->workflowhook->execute($flow, $action, $dataID);
+            if(dao::isError()) return false;
+
+            unset(dao::$cache[$flow->table]);
+        }
+
         $data = $this->getDataByID($flow, $dataID, $decode = false);
-        if(!$data) return true;
+        if(!$data)  return true;
+
+        if($flow->module == 'projectapproval' && $action->action == 'approvalreview3' && $data->reviewStatus == 'pass' && $data->reviewResult == 'pass')
+        {
+            $data->changeType    = $oldData->changeType;
+            $oldData->changeType = '';
+        }
 
         return array('changes' => commonModel::createChanges($oldData, $data), 'message' => $message);
     }
@@ -2519,13 +2655,13 @@ EOT;
      * @access public
      * @return bool | array
      */
-    public function approvalSubmit($flow, &$data, $dataID)
+    public function approvalSubmit($flow, &$data, $dataID, $action = '')
     {
         $reviewers = $this->post->approval_reviewer ? $this->post->approval_reviewer : array();
         $ccers     = $this->post->approval_ccer     ? $this->post->approval_ccer     : array();
         $idList    = $this->post->approval_id       ? $this->post->approval_id       : array();
 
-        $result = $this->loadModel('approval')->createApprovalObject(0, $dataID, $flow->module, $reviewers, $ccers, $idList);
+        $result = $this->loadModel('approval')->createApprovalObject(0, $dataID, $flow->module, $reviewers, $ccers, $idList, '', $action);
         if($result === false || empty($result['approvalID'])) return array('result' => 'fail', 'message' => $this->lang->flow->error->approval);
 
         $data->reviewers     = '';
@@ -2560,10 +2696,11 @@ EOT;
      * @param  object $flow
      * @param  object $data
      * @param  int    $dataID
+     * @param  string $action
      * @access public
      * @return bool | array
      */
-    public function approvalCancel($flow, &$data, $dataID)
+    public function approvalCancel($flow, &$data, $dataID, $action = '')
     {
         $data->reviewers     = '';
         $data->reviewOpinion = '';
@@ -2582,18 +2719,43 @@ EOT;
      * @param  object $flow
      * @param  object $data
      * @param  int    $dataID
+     * @param  string $action
      * @access public
      * @return bool | array
      */
-    public function approvalReview($flow, &$data, $dataID)
+    public function approvalReview($flow, &$data, $dataID, $action = '')
     {
         $approval = new stdclass();
         $approval->id          = $dataID;
         $approval->opinion     = $this->post->reviewOpinion;
         $approval->createdDate = helper::today();
 
+        if($this->post->isTrans && $this->post->isTrans == 'yes')
+        {
+            $result = $this->loadModel('approval')->trans($flow->module, $approval);
+            if(!$result['result']) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
+
+            $actionID = $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, 'transApproval');
+            $this->action->logHistory($actionID, $result['changes']);
+
+            if($this->post->reviewResult == 'noReview')
+            {
+                $approval  = $this->approval->getByObject($flow->module, $dataID);
+                $reviewers = $this->approval->getCurrentReviewers($approval->id);
+
+                $data->reviewResult  = $result === true ? $reviewResult : '';
+                $data->reviewStatus  = $result === true ? $reviewResult : 'doing';
+                $data->reviewOpinion = $reviewResult == 'reject' || $this->post->reviewOpinion ? $this->post->reviewOpinion : '';
+                $data->reviewers     = implode(',', $reviewers);
+                return;
+            }
+        }
+
         $reviewResult = $this->post->reviewResult;
         $reviewFunc   = $this->post->reviewResult;
+
+        if($this->post->reviewResult == 'adjust') $reviewFunc = 'reject';
+
         $result       = $this->loadModel('approval')->$reviewFunc($flow->module, $approval);
         if(dao::isError()) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
 
@@ -2652,7 +2814,7 @@ EOT;
                     if($field->field != 'id' && (!$field->show or $field->readonly)) continue;
 
                     if(isset($child[$field->field][$key]))
-                    {
+                     {
                         $childValue = $child[$field->field][$key];
 
                         if(is_array($childValue))
@@ -2692,6 +2854,8 @@ EOT;
                             ->exec();
 
                         foreach($deleteIDList as $dataID) $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, 'deleted');
+
+                        $this->session->set('isProjectapprovalChange', true);
                     }
                     continue;
                 }
@@ -2709,18 +2873,27 @@ EOT;
                     $dao = $this->checkRules($fields, $data, $dao);
 
                     $dao->where('id')->eq($data->id)->autoCheck()->exec();
+                    $updateIDList[] = $data->id;
 
                     if(!dao::isError())
                     {
                         $changes = commonModel::createChanges($oldData, $data);
 
+                        if($childModule == 'projectbusiness' || $childModule == 'projectvalue')
+                        {
+                            $changes = array_filter($changes, function($item)
+                            {
+                                return !($item['old'] === '0000-00-00' && empty($item['new']));
+                            });
+                        }
+
                         if($changes)
                         {
                             $actionID = $this->action->create(zget($this->config->flow->realModule, $flow->module), $data->id, 'edited');
                             $this->action->logHistory($actionID, $changes);
-                        }
 
-                        $updateIDList[] = $data->id;
+                            $this->session->set('isProjectapprovalChange', true);
+                        }
                     }
                 }
                 else
@@ -2737,6 +2910,8 @@ EOT;
                         $dataID = $this->dao->lastInsertId();
 
                         $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, 'created');
+
+                        $this->session->set('isProjectapprovalChange', true);
 
                         $createIDList[] = $dataID;
                     }
@@ -2758,6 +2933,20 @@ EOT;
                         }
                     }
                 }
+            }
+
+            $deleteIDList = array_diff(array_keys($datas), $updateIDList);
+
+            if($deleteIDList)
+            {
+                $this->dao->update($flow->table)->set('deleted')->eq('1')
+                    ->where('parent')->eq($parentID)
+                    ->andWhere('id')->in($deleteIDList)
+                    ->exec();
+
+                foreach($deleteIDList as $dataID) $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, 'deleted');
+
+                $this->session->set('isProjectapprovalChange', true);
             }
 
             if(!$createIDList && !$updateIDList) continue;
@@ -2799,6 +2988,8 @@ EOT;
                             ->exec();
 
                         foreach($deleteIDList as $dataID) $this->action->create(zget($this->config->flow->realModule, $flow->module), $dataID, 'deleted');
+
+                        $this->session->set('isProjectapprovalChange', true);
                     }
                 }
             }
@@ -3165,7 +3356,11 @@ EOT;
         {
             if(empty($field->canSearch)) continue;
 
-            if(in_array($field->control, $this->config->workflowfield->optionControls))
+            if($field->field == 'project' && $flow->module = 'business')
+            {
+                $field->options = $this->dao->select('id, name')->from('zt_flow_projectapproval')->where('deleted')->eq(0)->fetchPairs();
+            }
+            elseif(in_array($field->control, $this->config->workflowfield->optionControls))
             {
                 $field->options = $this->workflowfield->getFieldOptions($field, true, zget($fieldValues, $field->field, ''), '', $this->config->flowLimit);
             }
@@ -3287,7 +3482,7 @@ EOT;
         }
 
         $layoutFields = $this->loadModel('workflowlayout', 'flow')->getFields($flow->module, $action->action);
-        if(!empty($action->open) && $action->open != 'none' && (empty($this->config->openedApproval) || $flow->approval == 'disabled' || $action->action != 'approvalsubmit'))
+        if(!empty($action->open) && $action->open != 'none' && (empty($this->config->openedApproval) || $flow->approval == 'disabled' || strpos($action->action, 'approvalsubmit') !== false))
         {
             if(!$layoutFields)
             {
@@ -3546,7 +3741,6 @@ EOT;
                     $enabled = false;
                 }
             }
-
             if($enabled) return true;
         }
 
@@ -4066,6 +4260,7 @@ EOT;
                 $viewAction  = $this->loadModel('workflowaction', 'flow')->getByModuleAndAction($moduleName, 'view');
                 $class       = ($type == 'view' && $viewAction->open == 'modal' && $action->open == 'modal') ? "loadInModal iframe iframe" : '';
                 $attr        = ($type != 'menu' && $action->open == 'modal' && $class == '') ? "data-toggle='modal'" : '';
+                $dataWidth   = ($action->open == 'modal' && $action->module == 'projectapproval') ? "data-width='90%'" : '';
                 $deleter     = $action->method == 'delete' ? 'deleter' : '';
                 $link        = $this->createLink($appName . '.' . $module, $method, $params, $label, "{$class} {$reload} {$btn} {$deleter}", $attr);
 
@@ -4929,5 +5124,45 @@ EOT;
         }
 
         return $extendFields;
+    }
+
+    /**
+     * Get extend fields.
+     *
+     * @param  array $memberList
+     * @access public
+     * @return array
+     */
+    public function formatMemberData($memberList = array())
+    {
+        $memberData  = array();
+        $descOptions = array('foundingMember' => $this->config->foundingMember, 'businessPM' => $this->config->businessPM, 'itPM' => $this->config->itPM, 'productManager' => $this->config->productManager);
+        foreach($descOptions as $role => $desc) $memberData[$role] = array('id' => '', 'account' => '', 'projectRole' => $role, 'description' => $desc);
+
+        foreach($memberList as $id => $member)
+        {
+            $memberData[$member->projectRole] = array('id' => $id, 'account' => $member->account, 'projectRole' => $member->projectRole, 'description' => $member->description);
+        }
+        return $memberData;
+    }
+
+    /**
+     * Check the transTo field.
+     *
+     * @access public
+     * @return array
+     */
+    public function checkTransTo()
+    {
+        $isTrans = $this->post->isTrans;
+        $result  = array('result' => 'success');
+
+        if($isTrans && $isTrans == 'yes')
+        {
+            $transTo = $this->post->transTo;
+            if(empty($transTo)) $result = array('result' => 'fail', 'message' => $this->lang->transToEmpty);
+        }
+
+        return $result;
     }
 }

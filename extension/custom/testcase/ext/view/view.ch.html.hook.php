@@ -1,3 +1,25 @@
+<?php if($isLibCase):?>
+<?php
+$libHtml  = '';
+$libHtml = "<tr>";
+$libHtml .= "<th class='thWidth'>{$lang->testcase->callCase}</th>";
+$libHtml .= "<td>";
+
+if(isset($case->callCaseTitles))
+{
+    foreach($case->callCaseTitles as $callCaseID => $callCaseTitle)
+    {
+        $libHtml .= html::a($this->createLink('testcase', 'view', "caseID=$callCaseID", '', true), "#$callCaseID $callCaseTitle", '', "class='iframe' data-width='80%'") . '<br />';
+    }
+}
+
+$libHtml .= "<td></tr>";
+?>
+<script>
+var libRow = <?php echo json_encode($libHtml); ?>;
+$('#mainContent > div.side-col.col-4 > div:nth-child(1) > details > div > table > tbody').append(libRow);
+</script>
+<?php endif;?>
 <?php if($app->tab == 'chteam'):?>
 <?php
 js::set('from', $from);

@@ -671,7 +671,10 @@ class fileModel extends model
         if(isset($objectGroup[$objectType]))
         {
             $groupName = $objectGroup[$objectType];
-            $groupID   = $this->dao->findByID($objectID)->from($table)->fetch($groupName);
+            $object    = $this->dao->findByID($objectID)->from($table)->fetch();
+            $groupID   = isset($object->$groupName) ? $object->$groupName : 0;
+
+            if($objectType == 'testcase' && empty($groupID) && $object->lib) return true;
             return $this->loadModel($groupName)->checkPriv($groupID);
         }
 

@@ -27,8 +27,8 @@
       var checkExtension = fileTitle.lastIndexOf('.' + extension) == (fileTitle.length - extension.length - 1);
 
       var url = createLink('file', 'download', 'fileID=' + fileID + '&mouse=left');
-      url    += url.indexOf('?') >= 0 ? '&' : '?';
-      url    += '<?php echo $sessionString;?>';
+      //url    += url.indexOf('?') >= 0 ? '&' : '?';
+      //url    += '<?php echo $sessionString;?>';
 
       if(fileTypes.indexOf(extension) >= 0 && checkExtension && config.onlybody != 'yes')
       {

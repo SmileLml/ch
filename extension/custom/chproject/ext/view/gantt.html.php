@@ -504,7 +504,6 @@ $(function()
     };
 
     var ganttData = $.parseJSON(<?php echo json_encode($executionData);?>);
-    console.log(ganttData);
     if(!ganttData.data) ganttData.data = [];
 
     gantt.serverList("userList", <?php echo json_encode($userList);?>);

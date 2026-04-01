@@ -40,7 +40,7 @@ function genUserOptions(selectedUsers) {
     return options;
 }
 
-function genConditionSelect(index, cond) {
+function genConditionSelect(index, cond, isParallel) {
     if(typeof cond.type == 'undefined') {
       cond.type       = 'user';
       cond.selectType = 'account';
@@ -65,20 +65,29 @@ function genConditionSelect(index, cond) {
 
     var select = conditionTypeLang[cond.type].selectType[cond.selectType];
     html += '<div class="detail condition-select"><div class="detail-title">' + select.tips + '</div><div class="detail-content"><select id="condition-role" name="' + select.options + index + '" multiple class="form-control chosen">';
-    html += genOptions(select.options, cond);
+    html += genOptions(select.options, cond, isParallel);
     html += '</select></div></div>';
 
     return html;
 }
 
-function genOptions(opType, node) {
+function genOptions(opType, node, isParallel) {
     if(!opType) return [];
 
-    var data = {roles: roles, users: users, depts: depts};
+    var data = {roles: roles, users: users, depts: depts, groupMembers: groupMembers, permissionGroupings: permissionGroupings};
     var options = '';
+    
+    // 如果是并行分支且是users选项，在最前面添加系统成员选项
+    if(isParallel && opType == 'users') 
+    {
+        var isSystemUserSelected = typeof node.users != 'undefined' && node.users.indexOf('systemUser') != -1;
+        options += '<option ' + (isSystemUserSelected ? 'selected' : '') + ' value="systemUser">' + systemUsers + '</option>';
+    }
+    
     for(let key in data[opType]) {
         options += '<option ' + (typeof node[opType] == 'undefined' || node[opType].indexOf(key) == -1 ? '' : 'selected') + ' value="' + key + '">' + data[opType][key] + '</option>';
     }
+
     return options;
 }
 
@@ -90,7 +99,7 @@ function genDeptOptions(selectedDepts) {
     return options;
 }
 
-function bindConditionEvent(node) {
+function bindConditionEvent(node, isParallel) {
     $('.form-condition .close').click(function() {
         $(this).parent().remove();
         return false;
@@ -104,9 +113,9 @@ function bindConditionEvent(node) {
         }
 
         cond.selectType = $(this).val();
-        $(this).closest('.condition-block').html(genConditionSelect(index, cond));
+        $(this).closest('.condition-block').html(genConditionSelect(index, cond, isParallel));
         $('.chosen').chosen();
-        bindConditionEvent(node);
+        bindConditionEvent(node, isParallel);
     })
 }
 
@@ -383,11 +392,11 @@ function render(nodes, modify) {
         });
     })
 
-    function renderCondition(index, cond)
+    function renderCondition(index, cond, isParallel)
     {
         var type = cond.type ? cond.type : 'user';
         html  = '<div class="form-condition condition-block"><button class="close">×</button>';
-        html += genConditionSelect(index, cond);
+        html += genConditionSelect(index, cond, isParallel);
         html += '</div>';
 
         return html;
@@ -401,6 +410,7 @@ function render(nodes, modify) {
 
           var selectedFather = father.branches;
           var selectedIndex  = index;
+          var isParallel = father.branchType == 'parallel';
 
           modal = new $.zui.ModalTrigger({title: noticeTypeLang['setCondition'], custom: function(el) {
               var node = selectedFather[selectedIndex];
@@ -411,7 +421,7 @@ function render(nodes, modify) {
               }
               for(var index in node.conditions) {
                   var cond = node.conditions[index];
-                  html += renderCondition(index, cond);
+                  html += renderCondition(index, cond, isParallel);
               }
               html += '<div class="addCondition detail"><button class="btn btn-link">+ ' + noticeTypeLang['addCond'] + '</button><span>' + noticeTypeLang['conditionOr'] + '</span></div>';
 
@@ -427,13 +437,13 @@ function render(nodes, modify) {
 
               $('.addCondition .btn').click(function() {
                 var cond = {type: 'user', selectType: 'account', users: []};
-                $(this).parent().before(renderCondition(genID(), cond));
-                bindConditionEvent(selectedFather[selectedIndex]);
+                $(this).parent().before(renderCondition(genID(), cond, isParallel));
+                bindConditionEvent(selectedFather[selectedIndex], isParallel);
                 $('.chosen').chosen();
                 return false;
               })
 
-              bindConditionEvent(selectedFather[selectedIndex]);
+              bindConditionEvent(selectedFather[selectedIndex], isParallel);
             }, 20)
             return false;
           }})
@@ -461,7 +471,12 @@ function render(nodes, modify) {
             types[info.options] = true;
 
             html += '<div class="select-box detail ' + info.options + '-select ' + (info.options == opType ? '' : 'hidden') + '">';
-            if(info.options) html += '<div class="detail-title">' + info.tips + '</div><div class="detail-content"><select id="' + info.options + index + '" name="' + info.options + index + '" class="form-control chosen" multiple>' + genOptions(info.options, reviewer) + '</select></div>';
+            if(info.options)
+            {
+                if(info.options != 'groupMembers' && info.options != 'permissionGroupings') html += '<div class="detail-title">' + info.tips + '</div><div class="detail-content"><select id="' + info.options + index + '" name="' + info.options + index + '" class="form-control chosen" multiple>' + genOptions(info.options, reviewer) + '</select></div>';
+                if(info.options == 'groupMembers') html += '<div class="detail-title">' + info.tips + '</div><div class="detail-content"><select id="groupMember' + index + '" name="groupMember' + index + '" class="form-control chosen" multiple>' + genOptions(info.options, reviewer) + '</select></div>';
+                if(info.options == 'permissionGroupings') html += '<div class="detail-title">' + info.tips + '</div><div class="detail-content"><select id="permissionGrouping' + index + '" name="permissionGrouping' + index + '" class="form-control chosen">' + genOptions(info.options, reviewer) + '</select></div>';
+            }
             html += '</div>';
         }
 
@@ -475,7 +490,10 @@ function render(nodes, modify) {
         var type = cc.type ? cc.type : 'select';
         html += '<div class="form-cc cc-block"><button class="close">×</button><div class="form-title">' + userTypeLang['cc'] + '</div>';
         html += '<div class="detail"><div class="detail-title">' + noticeTypeLang['ccType'] + '</div><div class="detail-content"><select id="ccType' + index + '" name="ccType' + index + '" class="form-control chosen">';
+
         for(let rp in reviewerTypeLang) {
+            if(rp == 'groupMember')        continue;
+            if(rp == 'permissionGrouping') continue;
             html += '<option ' + (type == rp ? 'selected' : '') + ' value="' + rp + '">' + reviewerTypeLang[rp].name + '</option>';
         }
         html += '</select></div></div>';
@@ -570,6 +588,12 @@ function render(nodes, modify) {
                 html += '<div class="agentUser ' + (node.agentType == 'appointee' ? '' : 'hidden') + ' detail-content"><select id="agentUser" name="agentUser" class="form-control chosen">' + genUserOptions([node.agentUser]) + '</select></div>';
                 html += '</div>';
 
+                var onlyBy = node.onlyBy ? node.onlyBy : 'no';
+                html += '<div class="detail onlyBy-block ' + (reviewType == 'manual' ? '' : 'hidden') + '"><div class="detail-title">' + noticeTypeLang['onlyByType'] + '</div><div class="detail-content"><label class="radio-inline"><input type="radio" name="onlyBy" ' + (onlyBy== 'no' ? 'checked' : '') + ' value="no">' + noticeTypeLang['onlyByNo'] + '</label><label class="radio-inline"><input type="radio" name="onlyBy" ' + (onlyBy== 'yes' ? 'checked' : '') + ' value="yes">' + noticeTypeLang['onlyByYes'] + '</label></div></div>';
+
+                var needReviewer = node.needReviewer ? node.needReviewer : 'no';
+                html += '<div class="detail needReviewer-block ' + (reviewType == 'manual' ? '' : 'hidden') + '"><div class="detail-title">' + noticeTypeLang['needReviewer'] + '</div><div class="detail-content"><label class="radio-inline"><input type="radio" name="needReviewer" ' + (needReviewer== 'no' ? 'checked' : '') + ' value="no">' + noticeTypeLang['needReviewerNo'] + '</label><label class="radio-inline"><input type="radio" name="needReviewer" ' + (needReviewer== 'yes' ? 'checked' : '') + ' value="yes">' + noticeTypeLang['needReviewerYes'] + '</label></div></div>';
+
                 /* cc. */
                 var ccs = node.ccs ? node.ccs : [];
                 for(var index in ccs) {
@@ -627,6 +651,14 @@ function saveCondition(id) {
                 var index = d.name.substring(5);
                 if(typeof conditions[index].depts == 'undefined') conditions[index].depts = [];
                 conditions[index].depts.push(d.value);
+            } else if(d.name.indexOf('groupMembers') === 0) { // 权限分组成员
+                var index = d.name.substring(5);
+                if(typeof conditions[index].groupMembers == 'undefined') conditions[index].groupMembers = [];
+                conditions[index].groupMembers.push(d.value);
+            } else if(d.name.indexOf('permissionGroupings') === 0) { // 权限分组
+                var index = d.name.substring(5);
+                if(typeof conditions[index].permissionGroupings == 'undefined') conditions[index].permissionGroupings = [];
+                conditions[index].permissionGroupings.push(d.value);
             }
         }
 
@@ -657,6 +689,14 @@ function checkConditions(conditions) {
             } else if(condition.selectType == 'role') {
                 if(typeof condition.roles == 'undefined' || condition.roles.length == 0) {
                     return warningLang['selectRole'];
+                }
+            } else if(condition.selectType == 'groupMember') {
+                if(typeof condition.groupMembers == 'undefined' || condition.groupMembers.length == 0) {
+                    return warningLang['selectGroupMembers'];
+                }
+            } else if(condition.selectType == 'permissionGrouping') {
+                if(typeof condition.permissionGroupings == 'undefined' || condition.permissionGroupings.length == 0) {
+                    return warningLang['selectGroupMembers'];
                 }
             }
         }
@@ -695,6 +735,10 @@ function saveNode(id) {
                           reviewers[index].users = [];
                         } else if(d.value == 'role') {
                           reviewers[index].roles = [];
+                        } else if(d.value == 'groupMember') {
+                          reviewers[index].groupMembers = [];
+                        } else if(d.value == 'permissionGrouping') {
+                          reviewers[index].permissionGroupings = [];
                         }
                     } else if(d.name.indexOf('roles') === 0) {
                         var index = d.name.substring(5);
@@ -706,6 +750,16 @@ function saveNode(id) {
                         if(reviewers[index].type == 'appointee') {
                           reviewers[index].users.push(d.value);
                         }
+                    } else if(d.name.indexOf('groupMember') === 0) { // 权限分组成员
+                        var index = d.name.substring(11);
+                        if(reviewers[index].type == 'groupMember') {
+                          reviewers[index].groupMembers.push(d.value);
+                        }
+                    } else if(d.name.indexOf('permissionGrouping') === 0) { // 权限分组
+                        var index = d.name.substring(18);
+                        if(reviewers[index].type == 'permissionGrouping') {
+                          reviewers[index].permissionGroupings.push(d.value);
+                        }
                     } else if(d.name == 'multiple') {
                         data.multiple = d.value;
                     } else if(d.name == 'agentType') {
@@ -714,6 +768,10 @@ function saveNode(id) {
                         if(data.agentType == 'appointee') {
                             data.agentUser = d.value;
                         }
+                    } else if(d.name == 'onlyBy') {
+                        data.onlyBy = d.value;
+                    } else if(d.name == 'needReviewer') {
+                        data.needReviewer = d.value;
                     }
                 }
             }
@@ -776,8 +834,16 @@ function checkNode(type, data) {
                 return warningLang['selectUser'];
             } else if(reviewer.type == 'role' && reviewer.roles.length === 0) {
                 return warningLang['selectRole'];
+            } else if(reviewer.type == 'groupMember') {
+                if(reviewer.groupMembers.length === 0) return warningLang['selectGroupMembers'];
+                if(reviewerSelectCount !== 0)          return warningLang['oneGroupMember'];
+                reviewerSelectCount++;
+            } else if(reviewer.type == 'permissionGrouping') {
+                if(reviewer.permissionGroupings.length === 0) return warningLang['selectGroupMembers'];
+                if(reviewerSelectCount !== 0)                 return warningLang['oneGroupMember'];
+                reviewerSelectCount++;
             } else if(reviewer.type == 'select') {
-                if(reviewerSelectCount !== 0) return warningLang['oneSelect'];
+                if(reviewerSelectCount !== 0) return warningLang['oneGroupMember'];
                 reviewerSelectCount++;
             }
         }
@@ -824,7 +890,12 @@ function renderConditions(conditions) {
         if(condition.selectType == 'account' && condition.users.length > 0) {
             var userConditionText = '';
             for(let userIndex in condition.users) {
-                userConditionText += users.hasOwnProperty(condition.users[userIndex]) ? users[condition.users[userIndex]] + '、' : '';
+                if(condition.users[userIndex] == 'systemUser') {
+                    // 系统成员选项
+                    userConditionText += (typeof systemUsers != 'undefined' ? systemUsers : systemUser) + '、';
+                } else if(users.hasOwnProperty(condition.users[userIndex])) {
+                    userConditionText += users[condition.users[userIndex]] + '、';
+                }
             }
             if(conditionNum <= 2) conditionText += conditionTextLang.user + userConditionText.slice(0, -1) + '<br>';
             conditionTitleText += conditionTextLang.user + userConditionText.slice(0, -1);
@@ -846,6 +917,24 @@ function renderConditions(conditions) {
             }
             if(conditionNum <= 2) conditionText += conditionTextLang.role + roleConditionText.slice(0, -1) + '<br>';
             conditionTitleText += conditionTextLang.role + roleConditionText.slice(0, -1);
+        }
+
+        if(condition.selectType == 'groupMember') {
+            var groupMemberConditionText = '';
+            for(let groupMemberIndex in condition.groupMembers) {
+                groupMemberConditionText += groupMembers.hasOwnProperty(condition.groupMembers[groupMemberIndex]) ? groupMembers[condition.groupMembers[groupMemberIndex]] + '、' : '';
+            }
+            if(conditionNum <= 2) conditionText += conditionTextLang.groupMember + groupMemberConditionText.slice(0, -1) + '<br>';
+            conditionTitleText += conditionTextLang.groupMember + groupMemberConditionText.slice(0, -1);
+        }
+
+        if(condition.selectType == 'permissionGrouping') {
+            var permissionGroupingConditionText = '';
+            for(let permissionGroupingIndex in condition.permissionGroupings) {
+                permissionGroupingConditionText += permissionGroupings.hasOwnProperty(condition.permissionGroupings[permissionGroupingIndex]) ? permissionGroupings[condition.permissionGroupings[permissionGroupingIndex]] + '、' : '';
+            }
+            if(conditionNum <= 2) conditionText += conditionTextLang.permissionGrouping + permissionGroupingConditionText.slice(0, -1) + '<br>';
+            conditionTitleText += conditionTextLang.permissionGrouping + permissionGroupingConditionText.slice(0, -1);
         }
 
         if(conditionNum == 3) conditionText += '...';

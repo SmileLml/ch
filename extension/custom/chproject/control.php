@@ -317,9 +317,17 @@ class chproject extends control
         $moduleTree = $this->tree->getTeamTreeMenu('task', $projectID, 0, $linkParams);
 
         $intances = $this->chproject->getIntances($projectID);
+        $allStories = array();
+        foreach($intances as $intance)
+        {
+            $stories = $this->loadModel('story')->getExecutionStoryPairs($intance, 0, 'all', $moduleID, 'full', 'all');
+            if($stories) unset($stories[0]);
+            $allStories += $stories;
+        }
 
         /* Assign. */
         $this->view->tasks            = $tasks;
+        $this->view->stories          = $allStories;
         $this->view->summary          = $this->execution->summary($tasks);
         $this->view->tabID            = 'task';
         $this->view->pager            = $pager;
@@ -483,8 +491,8 @@ class chproject extends control
         $this->view->param                 = $param;
         $this->view->isAllProduct          = ($this->cookie->storyProductParam or $this->cookie->storyModuleParam or $this->cookie->storyBranchParam) ? false : true;
         $this->view->tabID                 = 'story';
-        $this->view->storyTasks            = $this->loadModel('task')->getStoryTaskCounts($storyIdList);
-        $this->view->storyBugs             = $this->loadModel('bug')->getStoryBugCounts($storyIdList);
+        $this->view->storyTasks            = $this->loadModel('task')->getStoryTaskCounts($storyIdList, $intanceProjectID);
+        $this->view->storyBugs             = $this->loadModel('bug')->getStoryBugCounts($storyIdList, $intanceProjectID);
         $this->view->storyCases            = $this->loadModel('testcase')->getStoryCaseCounts($storyIdList);
         $this->view->users                 = $this->user->getPairs('noletter');
         $this->view->pager                 = $pager;
@@ -672,8 +680,7 @@ class chproject extends control
         $pager      = new pager($recTotal, $recPerPage, $pageID);
         $sort       = common::appendOrder($orderBy);
         $executions = $intanceProjectID ? $this->execution->getPairsByProjectID($intanceProjectID, 'id') : [];
-        $bugs       = $this->bug->getExecutionBugs($executions ? array_intersect($intances, $executions) : $intances, $productID, $branch, $build, $type, $param, $sort, '', $pager, 'chproject');
-        $bugs       = $this->bug->checkDelayedBugs($bugs);
+        
         $users      = $this->user->getPairs('noletter');
 
         /* team member pairs. */
@@ -686,7 +693,30 @@ class chproject extends control
         $intanceProjects = $this->chproject->getIntancesProjectOptions($projectID, 'projectID', 'projectName');
         /* Build the search form. */
         $actionURL = $this->createLink('chproject', 'bug', "projectID=$projectID&intanceProjectID=$intanceProjectID&productID=$productID&branch=$branch&orderBy=$orderBy&build=$build&type=bysearch&queryID=myQueryID");
+        
         $this->chproject->buildBugSearchForm($products, $intanceProjects, $queryID, $actionURL, $intances, $projectID);
+
+        if(!$this->session->chprojectBugQuery or !$this->session->chprojectBugFormID or $this->session->chprojectBugFormID != $projectID)
+        {
+            $searchParams = $this->session->chprojectBugsearchParams;
+            
+            $this->loadModel('search')->initSession('chprojectBug', json_decode($searchParams['searchFields'], true), json_decode($searchParams['fieldParams'], true));
+            $chprojectBugForm = $this->session->chprojectBugForm;
+            $chprojectBugForm['field1']    = 'openedDate';
+            $chprojectBugForm['operator1'] = '>=';
+            $chprojectBugForm['value1']    = $project->begin;
+            $chprojectBugForm['field4']    = 'openedDate';
+            $chprojectBugForm['operator4'] = '<=';
+            $chprojectBugForm['value4']    = $project->end;
+
+            $this->session->set('chprojectBugForm', $chprojectBugForm);
+            $this->session->set('chprojectBugQuery', "(( 1 AND `openedDate` >= '{$project->begin}' AND `openedDate` <= '{$project->end}' ) AND ( 1 ))");
+        }
+        
+        $this->session->set('chprojectBugFormID', $projectID);
+
+        $bugs = $this->bug->getExecutionBugs($executions ? array_intersect($intances, $executions) : $intances, $productID, $branch, $build, $type, $param, $sort, '', $pager, 'chproject');
+        $bugs = $this->bug->checkDelayedBugs($bugs);
 
         $product = $this->product->getById($productID);
         $showBranch      = false;
@@ -1237,7 +1267,7 @@ class chproject extends control
         $this->view->productID           = $productID;
         $this->view->productNames        = $productNames;
         $this->view->productNum          = count($productNames);
-        $this->view->allPlans            = [];
+        $this->view->allPlans            = $allPlans;
         $this->view->browseType          = $browseType;
         $this->view->features            = $this->execution->getExecutionFeatures($defaultExecution);
         $this->view->kanbanGroup         = $kanbanGroup;

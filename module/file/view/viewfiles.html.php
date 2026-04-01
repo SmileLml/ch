@@ -75,8 +75,8 @@ function downloadFile(fileID, extension, imageWidth, fileTitle, type = 'download
     var checkExtension = fileTitle.lastIndexOf('.' + extension) == (fileTitle.length - extension.length - 1);
 
     var url = createLink('file', type, 'fileID=' + fileID + '&mouse=left');
-    url    += url.indexOf('?') >= 0 ? '&' : '?';
-    url    += '<?php echo $sessionString;?>';
+    //url    += url.indexOf('?') >= 0 ? '&' : '?';
+    //url    += '<?php echo $sessionString;?>';
 
     if(fileTypes.indexOf(extension) >= 0 && checkExtension && config.onlybody != 'yes')
     {
@@ -132,6 +132,7 @@ function setFileName(fileID)
     var fileName  = $('#fileName' + fileID).val();
     var extension = $('#extension' + fileID).val();
     var postData  = {'fileName' : fileName, 'extension' : extension};
+    var sizeHtml  = $('#fileTitle' + fileID).find('.text-muted').prop('outerHTML');
     $.ajax(
     {
         url:createLink('file', 'edit', 'fileID=' + fileID),
@@ -140,7 +141,7 @@ function setFileName(fileID)
         data: postData,
         success: function(data)
         {
-            $('#fileTitle' + fileID).html("<i class='icon icon-file-text'></i> &nbsp;" + data['title']);
+            $('#fileTitle' + fileID).html("<i class='icon icon-file-text'></i> &nbsp;" + data['title'] + sizeHtml);
             $('#renameFile' + fileID).closest('li').removeClass('hidden');
             $('#renameBox' + fileID).closest('li').addClass('hidden');
         }

@@ -23,8 +23,6 @@ class mytask extends task
         $extra = str_replace(array(',', ' '), array('&', ''), $extra);
         parse_str($extra, $output);
 
-        $this->loadModel('chproject');
-
         if($this->app->tab == 'chteam')
         {
             $executionIdList = $this->loadModel('chproject')->getIntances($chProjectID);
@@ -113,6 +111,18 @@ class mytask extends task
 
             setcookie('lastTaskModule', (int)$this->post->module, $this->config->cookieLife, $this->config->webRoot, '', $this->config->cookieSecure, false);
             if($this->post->execution) $executionID = (int)$this->post->execution;
+
+            if($_POST['story'] && $task->parent != '-1')
+            {
+                $story               = $this->loadModel('story')->getById($_POST['story']);
+                $linkedStoryEstimate = $this->dao->select('sum(estimate) as estimateSum')->from('zt_task')
+                    ->where('story')->eq($_POST['story'])
+                    ->andWhere('deleted')->eq(0)
+                    ->andWhere('parent')->ne('-1')
+                    ->fetch('estimateSum');
+
+                if((int)$linkedStoryEstimate + $_POST['estimate'] > ($story->estimate * 8)) return $this->send(array('result' => 'fail', 'message' => $this->lang->task->beyondEstimateError));
+            }
 
             /* Create task here. */
             $tasksID = $this->task->create($executionID, $bugID);
@@ -222,7 +232,7 @@ class mytask extends task
                 $response['locate']  = $this->createLink('task', 'create', "executionID=$executionID&storyID={$storyParam}&moduleID=$moduleID&taskID=0&todoID=0&extra=&bugID=0&chProjectID=$chProjectID");
                 if($this->app->tab == 'project') $response['locate'] = 'reload';
 
-                if($this->app->tab == 'chteam' && ($storyParam == $storyID || empty($storyParam))) $response['locate'] = 'reload';
+                if($this->app->tab == 'chteam' && $storyParam == $storyID) $response['locate'] = 'reload';
 
                 return $this->send($response);
             }
@@ -310,9 +320,9 @@ class mytask extends task
             }
         }
 
-        if($chProjectID) $executions = $this->chproject->getIntancesProjectOptions($chProjectID);
+        if($chProjectID && $this->app->tab == 'chteam') $executions = $this->chproject->getIntancesProjectOptions($chProjectID);
 
-        $stories = $this->story->getExecutionStoryPairs(array_keys($executions), 0, 'all', '', '', 'active');
+        $stories = $this->story->getExecutionStoryPairs(array_keys($executions), 0, 'all', '', '', 'all');
 
         $lifetimeList  = array();
         $attributeList = array();
@@ -336,18 +346,10 @@ class mytask extends task
         $this->view->showFields    = $this->config->task->custom->createFields;
         $this->view->showAllModule = $showAllModule;
 
-        $gobackLink = (isset($output['from']) and $output['from'] == 'global') ? $this->createLink('execution', 'task', "executionID=$executionID") : '';
-
-        if($this->app->tab == 'chteam')
-        {
-            $from = (isset($output['from']) && $output['from'] == 'story') ? 'story' : 'task';
-            $gobackLink = $this->createLink('chproject', $from, "projectID=$chProjectID");
-        }
-
         $this->view->title            = $title;
         $this->view->testStories      = $testStories;
         $this->view->position         = $position;
-        $this->view->gobackLink       = $gobackLink;
+        $this->view->gobackLink       = (isset($output['from']) and $output['from'] == 'global') ? $this->createLink('execution', 'task', "executionID=$executionID") : '';
         $this->view->execution        = $execution;
         $this->view->executions       = $executions;
         $this->view->lifetimeList     = $lifetimeList;

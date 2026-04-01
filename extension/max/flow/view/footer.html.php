@@ -1,4 +1,13 @@
 <?php
+if(file_exists($bottomHookFile))
+{
+    include $bottomHookFile;
+}
+if(file_exists($commonBottomHookFile))
+{
+    include $commonBottomHookFile;
+}
+
 if(isset($flowAction)) $action = $flowAction;   // The view method has the $flowAction property instead of the $action property.
 if(!empty($flow->js))   js::execute($flow->js);
 if(!empty($action->js)) js::execute($action->js);
@@ -16,4 +25,13 @@ else
     {
         include $app->getModuleRoot() . 'common/view/footer.html.php';
     }
+}
+
+if(file_exists($footerHookFile))
+{
+    include $footerHookFile;
+}
+if(file_exists($commonFooterHookFile))
+{
+    include $commonFooterHookFile;
 }

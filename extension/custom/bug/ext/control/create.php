@@ -69,7 +69,7 @@ class mybug extends bug
 
         if(!empty($_POST))
         {
-            if($chprojectID)
+            if($chprojectID && $this->app->tab == 'chteam')
             {
                 $noProductExecutions = $chprojectID ? $this->chproject->getIntances($chprojectID, true) : [];
                 if(!isset($noProductExecutions[$_POST['execution']])) $_POST['product'] = $this->loadModel('product')->getProductIDByProject($_POST['execution']);

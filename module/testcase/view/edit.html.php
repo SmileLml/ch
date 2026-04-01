@@ -146,7 +146,11 @@
           </div>
           <div class='text-center detail form-actions'>
             <?php echo html::hidden('lastEditedDate', $case->lastEditedDate);?>
-            <?php echo html::submitButton(). html::backButton();;?>
+            <?php
+            $toCases = $this->dao->select('*')->from(TABLE_CASE)->where('fromCaseID')->eq($case->id)->fetchAll();
+            $syncEditButton = (common::hasPriv('testcase', 'syncEdit') && ($case->fromCaseID or $toCases) && $case->product) ? html::commonButton($lang->testcase->syncEdit, "id='saveDraftButton'", 'btn btn-secondary btn-wide') : '';
+            echo html::commonButton($lang->save, "id='saveButton'", 'btn btn-primary btn-wide') . $syncEditButton . html::backButton();
+            ?>
           </div>
           <?php include '../../common/view/action.html.php';?>
         </div>
@@ -334,6 +338,59 @@ $(function()
 {
     $('#subNavbar [data-id=testcase]').addClass('active');
     $('#navbar [data-id=testcase]').addClass('active');
+    var $saveButton      = $('#saveButton');
+    var $saveDraftButton = $('#saveDraftButton');
+    $saveButton.on('click', function(e)
+    {
+        $saveButton.attr('type', 'submit').attr('disabled', true);
+        $saveDraftButton.attr('disabled', true);
+
+        $('<input />').attr('type', 'hidden').attr('name', 'isSync').attr('value', '0').appendTo('#dataform');
+        $('#dataform').submit();
+        e.preventDefault();
+
+        setTimeout(function()
+        {
+            if($saveButton.attr('disabled') == 'disabled')
+            {
+                setTimeout(function()
+                {
+                    $saveButton.attr('type', 'button').removeAttr('disabled');
+                    $saveDraftButton.removeAttr('disabled');
+                }, 10000);
+            }
+            else
+            {
+                $saveDraftButton.removeAttr('disabled');
+            }
+        }, 100);
+    });
+
+    $saveDraftButton.on('click', function(e)
+    {
+        $saveButton.attr('disabled', true);
+        $saveDraftButton.attr('type', 'submit').attr('disabled', true);
+
+        $('<input />').attr('type', 'hidden').attr('name', 'isSync').attr('value', '1').appendTo('#dataform');
+        $('#dataform').submit();
+        e.preventDefault();
+
+        setTimeout(function()
+        {
+            if($saveDraftButton.attr('disabled') == 'disabled')
+            {
+                setTimeout(function()
+                {
+                    $saveButton.removeAttr('disabled');
+                    $saveDraftButton.attr('type', 'button').removeAttr('disabled');
+                }, 10000);
+            }
+            else
+            {
+                $saveButton.removeAttr('disabled');
+            }
+        }, 100);
+    });
     checkScript();
 })
 

@@ -15,14 +15,17 @@
 <?php js::set('users', $users);?>
 <?php js::set('depts', $depts);?>
 <?php js::set('roles', $roles);?>
-<?php js::set('nodeTypeLang',      $lang->approvalflow->nodeTypeList);?>
-<?php js::set('userTypeLang',      $lang->approvalflow->userTypeList);?>
-<?php js::set('noticeTypeLang',    $lang->approvalflow->noticeTypeList);?>
-<?php js::set('warningLang',       $lang->approvalflow->warningList);?>
-<?php js::set('reviewerTypeLang',  $lang->approvalflow->reviewerTypeList);?>
-<?php js::set('reviewTypeLang',    $lang->approvalflow->reviewTypeList);?>
-<?php js::set('conditionTypeLang', $lang->approvalflow->conditionTypeList);?>
-<?php js::set('conditionTextLang', $lang->approvalflow->conditionText);?>
+<?php js::set('systemUsers', $lang->approvalflow->systemUser);?>
+<?php js::set('groupMembers',        $lang->approvalflow->groupMemberList);?>
+<?php js::set('permissionGroupings', $permissionGroupings);?>
+<?php js::set('nodeTypeLang',        $lang->approvalflow->nodeTypeList);?>
+<?php js::set('userTypeLang',        $lang->approvalflow->userTypeList);?>
+<?php js::set('noticeTypeLang',      $lang->approvalflow->noticeTypeList);?>
+<?php js::set('warningLang',         $lang->approvalflow->warningList);?>
+<?php js::set('reviewerTypeLang',    $lang->approvalflow->reviewerTypeList);?>
+<?php js::set('reviewTypeLang',      $lang->approvalflow->reviewTypeList);?>
+<?php js::set('conditionTypeLang',   $lang->approvalflow->conditionTypeList);?>
+<?php js::set('conditionTextLang',   $lang->approvalflow->conditionText);?>
 <?php js::set('link', inLink('design', "flowID=$flow->id"));?>
 
 <div id='mainContent'>

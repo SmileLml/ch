@@ -27,11 +27,37 @@
 <?php endif;?>
   <div class='panel'>
     <table id='fixedEnabled' class='table table-layout'>
-      <tr class='fixed-enabled head'>
-        <?php $cols = $action->method == 'view' ? 4 : 6;?>
-        <?php if($action->buildin == '1' && $action->method == 'edit' && $action->layout == 'side') $cols = 7;?>
-        <td colspan="<?php echo $cols;?>"><i class='icon-check'></i> <span class='title'><span class='title-bar'><strong><?php echo $lang->workflow->mainTable . $lang->colon . $flow->name;?></strong></span></span></td>
-      <tr>
+      <thead>
+        <?php if($action->method != 'browse' && $action->method != 'view' && $action->buildin == 0):?>
+        <tr>
+          <th><?php echo $lang->workflowlayout->columns?></th>
+          <td colspan='2'><?php echo html::input('columns', $action->columns, "class='form-control'");?></td>
+        </tr>
+        <?php endif;?>
+        <tr class='fixed-enabled head'>
+          <th><?php echo $lang->workflowlayout->field?></th>
+          <?php if($action->method == 'browse'):?>
+          <th></th>
+          <?php endif;?>
+          <?php if($action->method != 'view'):?>
+          <th><?php echo $lang->workflowlayout->width?></th>
+          <?php endif;?>
+          <?php if($action->method != 'browse' && $action->method != 'view'):?>
+          <?php if($action->buildin == 0):?>
+          <th><?php echo $lang->workflowlayout->colspan?></th>
+          <th><?php echo $lang->workflowlayout->titleWidth?></th>
+          <th><?php echo $lang->workflowlayout->titleColspan?></th>
+          <?php endif;?>
+          <th><?php echo $lang->workflowlayout->layoutRules?></th>
+          <th><?php echo $lang->workflowlayout->defaultValue?></th>
+          <th><?php echo $lang->workflowlayout->readonly?></th>
+          <?php endif;?>
+          <?php if($action->method == 'view' or $action->method == 'browse' or $action->layout == 'side'):?>
+          <th><?php echo $lang->workflowlayout->position;?></th>
+          <?php endif;?>
+          <th><?php echo $lang->workflowlayout->show?></th>
+        </tr>
+      </thead>
     </table>
     <table id='fixedRequired' class='table table-layout'></table>
 

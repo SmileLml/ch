@@ -179,7 +179,25 @@ js::set('loadLink', $loadLink);
                       }
                   }
                   ?>
+                  <?php if($child == 'sub_projectbusiness' && $childField->field == 'business'):?>
+                  <?php
+                  $business = $this->dao->select('*')->from('zt_flow_business')->where('id')->eq($childData->business)->fetch();
+                  $businessStyle = '';
+                  if($business->status == 'projectchange')
+                  {
+                      $objectVersion = $this->dao->select('element')->from('zt_objectversion')->where('objectType')->eq('business')->andWhere('objectID')->eq($business->id)->andWhere('version')->eq($business->version)->fetch('element');
+                      if(empty($objectVersion)) $objectVersion = $this->dao->select('element')->from('zt_objectversion')->where('objectType')->eq('business')->andWhere('objectID')->eq($business->id)->orderBy('version desc')->fetch('element');
+                      $objectVersion = json_decode($objectVersion);
+                      if($objectVersion->status == 'cancelled') $businessStyle = 'style="text-decoration: line-through;"';
+                      if($objectVersion->status == 'projectchange') $businessStyle = 'style="color:red"';
+                      if($objectVersion->status == 'projectchange' && $objectVersion->isCancel == 'Y') $businessStyle = 'style="text-decoration: line-through;color:red"';
+                  }
+                  $businessStyle  = ($business->status == 'closed' or $business->status == 'cancelled') ? 'style="color:gray"' : $businessStyle;
+                  ?>
+                  <td title='<?php echo $childValue;?>'><?php echo html::a($this->createLink('business', 'view', "businessID=$childData->business"), $childValue, "target='_blank' $businessStyle");?></td>
+                  <?php else:?>
                   <td title='<?php echo $childValue;?>'><?php echo $childValue;?></td>
+                  <?php endif;?>
                   <?php endforeach;?>
                 </tr>
                 <?php endforeach;?>

@@ -1,0 +1,7 @@
+.input-group-addon {min-width: 100px;}
+#pri + .chosen-container > .chosen-single {border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important;}
+
+.pri-selector > .btn {padding: 5px 8px !important; width: 100%;}
+.pri-selector > .dropdown-menu {padding: 10px;}
+
+.input-size {width: 85%}

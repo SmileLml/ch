@@ -295,6 +295,12 @@
           <th><?php echo $lang->execution->team;?></th>
           <td colspan='2'><?php echo html::select('teamMembers[]', $users, array_keys($teamMembers), "class='form-control picker-select' multiple"); ?></td>
         </tr>
+
+        <tr>
+          <th><?php echo $lang->execution->chteam;?></th>
+          <td colspan='2'><?php echo html::select('chteam[]', $chteam, explode(',',$chteam_selected), "class='form-control picker-select' multiple"); ?></td>
+        </tr>
+
         <tr>
           <th><?php echo $lang->execution->desc;?></th>
           <td colspan='2'><?php echo html::textarea('desc', htmlSpecialString($execution->desc), "rows='6' class='form-control kindeditor' hidefocus='true'");?></td>

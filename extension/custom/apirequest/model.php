@@ -131,9 +131,66 @@ class apiRequestModel extends model
         $data["msgObj"]["content"] = $content;
         $data["pushContent"]       = $title;
 
-        $response = $this->http($url, $data, 'POST', 'json', $headers);
+        $response = $this->http2($url, $data, 'POST', 'json', $headers);
 
-        $status = $response->Success ? 'success' : 'fail';
+        $status = $response ? 'success' : 'fail';
+        $this->saveRequestLog($url, 'POST', json_encode($headers), json_encode($data), $response, $status);
+
+        return $response;
+    }
+
+    public function http2($data,$headers) {
+            $url = $this->config->apiRequest->flashMessageUrl . '/api/OpenMessage/Send';
+            $ch = curl_init($url);
+            $data = json_encode($data);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            $response = curl_exec($ch);
+            curl_close($ch);
+            return $response;
+
+
+
+
+
+
+    }
+
+    /**
+     * send openMessage
+     * @param $account
+     * @param $content
+     * @return mixed
+     */
+    public function sendOpenMessage($account,$content)
+    {
+        /* Set the request url. */
+        $url = $this->config->apiRequest->flashMessageUrl . '/api/OpenMessage/Send';
+
+        /* headers. */
+        $headers = array();
+        $appkey = $this->config->apiRequest->flashMessageAppkey;
+        $now = round(microtime(true) *1000);
+        $secret = $this->config->apiRequest->flashMessageSecretKey;
+        $headers = array(
+            "Content-Type:" . "application/json;charset=utf-8",
+            "Appkey:" . $appkey,
+            "Timestamp:" . $now,
+            "Signature:" . strtoupper(md5($appkey . $now . $secret))
+        );
+
+        /* data */
+        $data = array();
+        $data["chattype"]          = 1; // 单聊
+        $data["chatid"]            = $account;
+        $data["msgType"]           = "newtext";
+        $data["msgObj"]["content"] = $content;
+ 
+        $response = $this->http2($data,$headers);
+
+        $status = $response ? 'success' : 'fail';
         $this->saveRequestLog($url, 'POST', json_encode($headers), json_encode($data), $response, $status);
 
         return $response;
@@ -166,7 +223,7 @@ class apiRequestModel extends model
         $log->requestDate = helper::now();
         $log->extra       = $extra;
 
-        $this->dao->insert(TABLE_REQUESTLOG)->data($log)->exec();
+        $this->dao->insert('zt_requestlog')->data($log)->exec();
         return $this->dao->lastInsertId();
     }
 

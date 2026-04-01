@@ -146,64 +146,65 @@ class testcase extends control
         /* Load pager. */
         $this->app->loadClass('pager', $static = true);
         $pager = new pager($recTotal, $recPerPage, $pageID);
-        $sort  = common::appendOrder($orderBy);
 
         $cases  = array();
-        $pager->pageID = $pageID;   // 场景和用例混排，$pageID 可能大于场景分页后的总页数。在 pager 构造函数中会被设为 1，这里要重新赋值。
+        $scenes = array();
+        $sort   = common::appendOrder($orderBy);
+        if(strpos($sort, 'caseID') !== false) $sort = str_replace('caseID', 'id', $sort);
 
-        $scenes = $this->testcase->getSceneGroups($productID, $branch, $moduleID, $caseType, $sort, $pager);   // 获取包含子场景和用例的顶级场景树。
-
-        if(!$this->cookie->onlyScene)
+        if($this->session->caseBrowseType == 'all' || $this->cookie->onlyScene)
         {
-            $recPerPage = $pager->recPerPage;
-            $sceneTotal = $pager->recTotal;
-            $sceneCount = count($scenes);
+            $pager->pageID = $pageID;   // 场景和用例混排，$pageID 可能大于场景分页后的总页数。在 pager 构造函数中会被设为 1，这里要重新赋值。
+            $scenes = $this->testcase->getSceneGroups($productID, $branch, $moduleID, $caseType, $sort, $pager);   // 获取包含子场景和用例的顶级场景树。
 
-            /* 场景条数小于每页记录数，继续获取用例。 */
-            if($sceneCount < $recPerPage)
+            if($this->session->caseBrowseType == 'all')
             {
-                /* 重置 $pager 属性，只获取需要的用例条数。*/
-                $pager->recTotal   = 0;
-                $pager->pageID     = 1; // 查询用例时的分页起始偏移量单独计算，每次查询的页码都设为 1 即可，后面会重新设置页码。
-                $pager->recPerPage = $recPerPage - $sceneCount; // 可能存在场景没排满一页，需要用例补全的情况。这里只查询需要补全的记录数。
+                $recPerPage = $pager->recPerPage;
+                $sceneTotal = $pager->recTotal;
+                $sceneCount = count($scenes);
 
-                if($sceneCount == 0) $pager->offset = $recPerPage * ($pageID - 1) - $sceneTotal;   // 场景数为 0 表示本页查询只显示用例，需要计算用例分页的起始偏移量。
+                /* 场景条数小于每页记录数，继续获取用例。 */
+                if($sceneCount < $recPerPage && !$this->cookie->onlyScene)
+                {
+                    /* 重置 $pager 属性，只获取需要的用例条数。*/
+                    $pager->recTotal   = 0;
+                    $pager->recPerPage = $recPerPage - $sceneCount;
+                    if($sceneCount > 0) $pager->pageID = 1; // 查询用例时的分页起始偏移量单独计算，每次查询的页码都设为 1 即可，后面会重新设置页码。
+                    if($sceneCount == 0) $pager->offset = - $sceneTotal;   // 场景数为 0 表示本页查询只显示用例，需要计算用例分页的起始偏移量。
 
-                $cases = $this->testcase->getTestCases($productID, $branch, $browseType, $browseType == 'bysearch' ? $queryID : $suiteID, $moduleID, $caseType, $sort, $pager);
-                $this->loadModel('common')->saveQueryCondition($this->dao->get(), 'testcase', false);
+                    $cases = $this->testcase->getTestCases($productID, $branch, $browseType, $queryID, $moduleID, $caseType, $sort, $pager, 'no');
+                    $this->loadModel('common')->saveQueryCondition($this->dao->get(), 'testcase', false);
+                }
+                else
+                {
+                    /* 场景和用例混排，总记录数需要合并后显示，这里是为了获取用例的总记录数。*/
+                    if(!$this->cookie->onlyScene) $cases = $this->testcase->getTestCases($productID, $branch, $browseType, $queryID, $moduleID, $caseType, $sort, $pager, 'no');
+                    $cases = array();
+                }
+
+                if(!$this->cookie->onlyScene)
+                {
+                    /* 合并场景和用例的总记录数，并重新计算总页数和当前页码。*/
+                    $pager->recTotal  += $sceneTotal;
+                    $pager->recPerPage = $recPerPage;
+                    $pager->pageTotal  = ceil($pager->recTotal / $recPerPage);
+                    $pager->pageID     = $pageID;
+                }
             }
-
-            /* 合并场景和用例的总记录数，并重新计算总页数和当前页码。*/
-            $pager->recTotal  += $sceneTotal;
-            $pager->recPerPage = $recPerPage;
-            $pager->pageTotal  = ceil($pager->recTotal / $recPerPage);
-            $pager->pageID     = $pageID;
-        }
-
-        $sceneCount = count($scenes);
-        $caseCount  = 0;
-        /* Process case for check story changed. */
-        if($this->config->edition == 'ipd') $cases = $this->loadModel('story')->getAffectObject($cases, 'case');
-        $cases = $this->loadModel('story')->checkNeedConfirm($cases);
-        $cases = $this->testcase->appendData($cases);
-        foreach($cases as $case)
-        {
-            $case->id      = 'case_' . $case->id;   // Add a prefix to avoid duplication with the scene ID.
-            $case->parent  = 0;
-            $case->grade   = 1;
-            $case->path    = ',' . $case->id . ',';
-            $case->isScene = false;
-            if(!$case->scene) $caseCount++;
-        }
-
-        if($this->cookie->onlyScene)
-        {
-            $summary = sprintf($this->lang->testcase->summaryScene, $sceneCount);
         }
         else
         {
-            $summary = sprintf($this->lang->testcase->summary, $sceneCount, $caseCount);
+            $cases = $this->testcase->getTestCases($productID, $branch, $browseType, $queryID, $moduleID, $caseType, $sort, $pager, 'no');
+            $this->loadModel('common')->saveQueryCondition($this->dao->get(), 'testcase', false);
         }
+
+        $sceneCount = count($scenes);
+        $caseCount  = count($cases);
+
+        /* Process case for check story changed. */
+        $scenes = $this->preProcessScenesForBrowse($scenes);
+        $cases  = $this->preProcessCasesForBrowse($cases);
+        if($this->config->edition == 'ipd') $cases = $this->loadModel('story')->getAffectObject($cases, 'case');
 
         /* Build the search form. */
         $currentModule = $this->app->tab == 'project' ? 'project'  : 'testcase';
@@ -246,17 +247,9 @@ class testcase extends control
             }
         }
 
-        $sceneCases = array_merge($scenes, $cases);
-        if($browseType == 'bysearch')
-        {
-            $sceneCases = $this->testcase->processSearchedData($scenes, $cases);
-        }
-
         /* Assign. */
         $tree = $moduleID ? $this->tree->getByID($moduleID) : '';
         $this->view->title           = $this->products[$productID] . $this->lang->colon . $this->lang->testcase->common;
-        $this->view->position[]      = html::a($this->createLink('testcase', 'browse', "productID=$productID&branch=$branch"), $this->products[$productID]);
-        $this->view->position[]      = $this->lang->testcase->common;
         $this->view->projectID       = $projectID;
         $this->view->productID       = $productID;
         $this->view->product         = $product;
@@ -267,14 +260,14 @@ class testcase extends control
         $this->view->moduleName      = $moduleID ? $tree->name : $this->lang->tree->all;
         $this->view->moduleID        = $moduleID;
         $this->view->projectType     = !empty($projectID) ? $this->dao->select('model')->from(TABLE_PROJECT)->where('id')->eq($projectID)->fetch('model') : '';
-        $this->view->summary         = $summary;
+        $this->view->summary         = sprintf($this->cookie->onlyScene ? $this->lang->testcase->summaryScene : $this->lang->testcase->summary, $sceneCount, $caseCount);
         $this->view->pager           = $pager;
         $this->view->users           = $this->user->getPairs('noletter');
         $this->view->orderBy         = $orderBy;
         $this->view->browseType      = $browseType;
         $this->view->param           = $param;
         $this->view->caseType        = $caseType;
-        $this->view->cases           = $sceneCases;
+        $this->view->cases           = array_merge($scenes, $cases);
         $this->view->branch          = (!empty($product) and $product->type != 'normal') ? $branch : 0;
         $this->view->branchOption    = $branchOption;
         $this->view->branchTagOption = $branchTagOption;
@@ -287,6 +280,75 @@ class testcase extends control
         $this->view->automation      = $this->loadModel('zanode')->getAutomationByProduct($productID);
 
         $this->display();
+    }
+
+    /**
+     * 预处理场景及其包含的用例，把层级结构改为平行结构，处理成数据表格支持的形式。
+     * Preprocess the scenario and the use cases it contains, change the hierarchical structure to a parallel structure, and process it into a form supported by the data table.
+     *
+     * @param  array  $scenes
+     * @access public
+     * @return array
+     */
+    public function preProcessScenesForBrowse($scenes)
+    {
+        $cases = array();
+        foreach($scenes as $scene)
+        {
+            $scene->hasCase = false;
+
+            if(!empty($scene->children))
+            {
+                $cases = array_merge($cases, $this->preProcessScenesForBrowse($scene->children));
+                foreach($scene->children as $child)
+                {
+                    /*
+                     * 如果子场景有用例，那么父场景也有用例。
+                     * If the child scene has a use case, the parent scene also has a use case.
+                     */
+                    if($child->hasCase)
+                    {
+                        $scene->hasCase = true;
+                        break;
+                    }
+                }
+            }
+            if(!empty($scene->cases))
+            {
+                $cases = array_merge($cases, $scene->cases);
+
+                $scene->hasCase = true;
+            }
+
+            unset($scene->children);
+            unset($scene->cases);
+
+            $cases[] = $scene;
+        }
+        return $cases;
+    }
+
+    /**
+     * 预处理没有场景的用例，附加额外的信息并给用例 ID 加前缀以防止和场景 ID 重复。
+     * Preprocess use cases without scenarios, append additional information and prefix the use case ID to prevent duplication with scenario IDs.
+     *
+     * @param  array  $cases
+     * @access public
+     * @return array
+     */
+    public function preProcessCasesForBrowse($cases)
+    {
+        /* Check if the related story of cases are changed. */
+        $cases = $this->loadModel('story')->checkNeedConfirm($cases);
+        $cases = $this->testcase->appendData($cases);
+        foreach($cases as $case)
+        {
+            $case->caseID  = $case->id;
+            $case->id      = 'case_' . $case->id;   // Add a prefix to avoid duplication with the scene ID.
+            $case->parent  = 0;
+            $case->isScene = false;
+        }
+        return $cases;
     }
 
     /**
@@ -1310,13 +1372,33 @@ class testcase extends control
             $changes = $this->testcase->review($caseID);
             if(dao::isError()) return print(js::error(dao::getError()));
 
-            if(is_array($changes))
+            if(is_array($changes) && count($changes))
             {
                 $result = $this->post->result;
                 $actionID = $this->loadModel('action')->create('case', $caseID, 'Reviewed', $this->post->comment, ucfirst($result));
                 $this->action->logHistory($actionID, $changes);
 
                 $this->executeHooks($caseID);
+                $case = $this->loadModel('case')->getByID($caseID);
+                /* send openMessage */
+                if(SX_ENABLE)
+                {
+                    $this->loadModel('apiRequest');
+                    $sub_arr = $changes[0];
+                    $reviewer_arr_str = !empty($sub_arr['new']) ? $sub_arr['new'] : $sub_arr['old'];
+                    $reviewer_arr = explode(",",$reviewer_arr_str);
+                    $review_url =  helper::createLink('my', 'audit', "browseType=testcase&param=&orderBy=time_desc");
+                    $msgContent = sprintf("您有待审批的[用例]，请前往%s 进行确认。编号：%s ，主题： %s ，创建人：%s",$review_url,$caseID,$case->title,$_SESSION['user']->account);
+
+                    foreach($reviewer_arr as $value)
+                    {
+                        try {
+                            $this->apiRequest->sendOpenMessage($value,$msgContent);
+                        } catch(Exception $e) {
+
+                        }
+                    }
+                }
 
                 return print(js::reload('parent.parent'));
             }

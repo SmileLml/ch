@@ -142,6 +142,8 @@ $routes['/projects/:projectID/testtasks'] = 'testtasks';
 $routes['/testtasks']                     = 'testtasks';
 $routes['/testtasks/:id']                 = 'testtask';
 
+$routes['/testreport/:testtaskID']                 = 'testreport';
+
 $routes['/projects/:projectID/risks'] = 'risks';
 $routes['/risks']                     = 'risks';
 $routes['/risks/:id']                 = 'risk';
@@ -180,5 +182,8 @@ $routes['/z/files/:id/content'] = 'zfileContent';
 $routes['/gitlab/webhook'] = 'gitlabWebhook';
 
 $routes['/ciresults'] = 'ciresults';
+
+$routes['/projectReleases/:id']  = 'chreleases';
+$routes['/updateReleasesStatus'] = 'chreleases';
 
 $config->routes = $routes;

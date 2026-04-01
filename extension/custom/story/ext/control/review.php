@@ -15,8 +15,31 @@ class myStory extends story
     {
         if(!empty($_POST))
         {
+            $oldStory = $this->story->getById($storyID);
             $this->story->review($storyID);
             if(dao::isError()) return print(js::error(dao::getError()));
+
+            $story = $this->story->getById($storyID);
+            if(in_array($oldStory->status, array('PRDReviewing', 'confirming')) && in_array($story->status, array('PRDReviewed', 'active'))) $this->story->syncUpdateLinkStoryStatus($storyID);
+            if(($oldStory->status == 'confirming') && $story->status == 'active' && $story->business)
+            {
+                $noPortionPRD   = array('closed', 'cancelled', 'PRDPassed', 'beOnline', 'PRDReviewing', 'projectchange', 'portionPRD');
+                $businessStatus = $this->dao->select('status')->from('zt_flow_business')->where('id')->eq($story->business)->fetch('status');
+                if(!in_array($businessStatus, $noPortionPRD))
+                {
+                    $this->dao->update('zt_flow_business')->set('status')->eq('portionPRD')->where('id')->eq($story->business)->exec();
+                    $this->loadModel('flow')->mergeVersionByObjectType($story->business, 'business');
+                    $actionID = $this->loadModel('action')->create('business', $story->business, 'changeportionprd');
+                    $result['changes'][] = ['field' => 'status', 'old' => $businessStatus, 'new' => 'portionPRD'];
+                    $this->loadModel('action')->logHistory($actionID, $result['changes']);
+                }
+            }
+
+            $linkStoryIdList = $this->dao->select('id,BID')->from(TABLE_RELATION)
+                ->where('AID')->eq($storyID)
+                ->andWhere('AType')->eq('requirement')
+                ->fetchPairs('id', 'BID');
+            $this->story->changeRequirementStatusByStoryStage($linkStoryIdList);
 
             $this->executeHooks($storyID);
 
@@ -102,7 +125,10 @@ class myStory extends story
         }
 
         /* Get story and product. */
-        $story   = $this->story->getById($storyID);
+        $story = $this->story->getById($storyID);
+
+        if(!in_array($story->status, array('PRDReviewing', 'confirming', 'reviewing'))) return $this->send(array('result' => 'fail', 'message' => $this->lang->story->reviewDuplicate));
+
         $product = $this->dao->findById($story->product)->from(TABLE_PRODUCT)->fields('name, id')->fetch();
 
         $this->story->replaceURLang($story->type);
@@ -128,12 +154,14 @@ class myStory extends story
         /* Set the review result options. */
         $reviewers = $this->story->getReviewerPairs($storyID, $story->version);
         $this->lang->story->resultList = $this->lang->story->reviewResultList;
-
+        unset($this->lang->story->resultList['clarify']);
         if($story->status == 'reviewing')
         {
             if($story->version == 1) unset($this->lang->story->resultList['revert']);
             if($story->version > 1)  unset($this->lang->story->resultList['reject']);
         }
+
+        if($story->status == 'PRDReviewing' || $story->status == 'confirming') unset($this->lang->story->resultList['revert']);
 
         $this->view->title      = $this->lang->story->review . "STORY" . $this->lang->colon . $story->title;
         $this->view->position[] = html::a($this->createLink('product', 'browse', "product=$product->id&branch=$story->branch"), $product->name);

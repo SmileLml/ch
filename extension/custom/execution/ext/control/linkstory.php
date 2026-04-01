@@ -162,12 +162,12 @@ class myExecution extends execution
 
         if($browseType == 'bySearch')
         {
-            $allStories = $this->story->getBySearch('', '', $queryID, 'id', $objectID, $storyType);
+            $allStories = $this->story->getBySearch('', '', $queryID, 'id', $objectID, $storyType, '', '', null, 0, 0, true);
         }
         else
         {
             $status     = $storyType == 'story' ? 'active' : ($object->model == 'ipd' ? 'launched' : 'active,launched');
-            $allStories = $this->story->getProductStories(array_keys($products), $branchIDList, $moduleID = '0', $status, $storyType, 'id_desc', $hasParent = false, '', $pager = null, $objectID);
+            $allStories = $this->story->getProductStories(array_keys($products), $branchIDList, $moduleID = '0', $status, $storyType, 'id_desc', $hasParent = false, '', $pager = null, $objectID, 0, true);
         }
 
         $linkedStories = $this->story->getExecutionStoryPairs($objectID, 0, 'all', 0, 'full', 'all', $storyType);

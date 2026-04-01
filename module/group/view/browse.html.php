@@ -45,11 +45,23 @@
         <td class='c-actions'>
           <?php $lang->group->managepriv = $lang->group->managePrivByGroup;?>
           <?php $lang->group->managemember = $lang->group->manageMember;?>
-          <?php $isProjectAdmin = $group->role == 'projectAdmin';?>
-          <?php if($isProjectAdmin):?>
+          <?php 
+            $isProjectAdmin    = $group->role == 'projectAdmin';
+            $isProjectapproval = $group->name == $this->lang->group->projectapprovalRole;
+          ?>
+          <?php if($isProjectAdmin || $isProjectapproval):?>
           <?php echo "<button class='btn disabled'><i class='icon icon-eye disabled' title='{$lang->group->manageView}'></i></button>";?>
           <?php echo "<button class='btn disabled'><i class='icon icon-lock disabled' title='{$lang->group->managepriv}'></i></button>";?>
-          <?php common::printIcon('group', 'manageProjectAdmin', "groupID=$group->id", $group, 'list', 'persons');?>
+          <?php
+            if($isProjectAdmin)
+            {
+                common::printIcon('group', 'manageProjectAdmin', "groupID=$group->id", $group, 'list', 'persons');
+            }
+            else
+            {
+                common::printIcon('group', 'manageMember', "groupID=$group->id", $group, 'list', 'persons', '', "iframe", true, "data-width='90%'");
+            } 
+          ?>
           <?php echo "<button class='btn disabled'><i class='icon icon-edit disabled' title='{$lang->group->edit}'></i></button>";?>
           <?php echo "<button class='btn disabled'><i class='icon icon-copy disabled' title='{$lang->group->copy}'></i></button>";?>
           <?php else:?>
@@ -62,7 +74,7 @@
           <?php
           if(common::hasPriv('group', 'delete'))
           {
-              if($isProjectAdmin)
+              if($isProjectAdmin || $isProjectapproval)
               {
                   echo "<a class='btn btn-admin disabled'><i class='icon icon-trash disabled' title='{$lang->group->delete}'></i></a>";
               }

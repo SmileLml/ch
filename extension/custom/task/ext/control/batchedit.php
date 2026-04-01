@@ -13,6 +13,8 @@ class mytask extends task
     {
         if($this->post->names)
         {
+            $isBeyondEstimate = $this->task->isBeyondEstimate($_POST, 'edit');
+            if(!$isBeyondEstimate) return $this->send(array('result' => 'fail', 'message' => $this->lang->task->beyondEstimateError));
             $allChanges = $this->task->batchUpdate();
             if(dao::isError()) return print(js::error(dao::getError()));
 
@@ -114,6 +116,29 @@ class mytask extends task
         /* Get edited tasks. */
         $tasks = $this->dao->select('*')->from(TABLE_TASK)->where('id')->in($taskIDList)->fetchAll('id');
         $teams = $this->dao->select('*')->from(TABLE_TASKTEAM)->where('task')->in($taskIDList)->fetchGroup('task', 'id');
+
+        $noEditTask = '';
+        foreach($tasks as $id => $task)
+        {
+            $isNotCloseProject = true;
+            if(!empty($task->project))
+            {
+                $projectapprovalID = $this->dao->select('instance')->from('zt_project')->where('id')->eq($task->project)->fetch();
+                
+                $projectapproval = $this->dao->select('status')->from('zt_flow_projectapproval')->where('id')->eq($projectapprovalID->instance)->fetch();
+                
+                if($projectapproval->status == 'cancelled' || $projectapproval->status == 'finished') $isNotCloseProject = false;
+            }
+            if(!$isNotCloseProject)
+            {
+                $noEditTask .= "#$id ";
+                unset($tasks[$id]);
+            }
+        }
+
+        if(!empty($noEditTask)) echo js::alert(sprintf($this->lang->story->batchEditProjectapprovalTip, $noEditTask));
+        if(empty($tasks)) return print(js::locate($this->session->taskList));
+
 
         /* Get execution teams. */
         $executionIDList = array();

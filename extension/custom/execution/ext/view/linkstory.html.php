@@ -113,7 +113,7 @@
                     <?php endif;?>
                     <td class='c-user'><?php echo zget($users, $story->openedBy);?></td>
                     <?php if($storyType != 'requirement'):?>
-                        <td class='text-right c-estimate' title="<?php echo $story->estimate . ' ' . $lang->hourCommon;?>"><?php echo $story->estimate . $config->hourUnit;?></td>
+                        <td class='text-right c-estimate' title="<?php echo $story->estimate . ' ' . $lang->hourCommon;?>"><?php echo $story->estimate . $this->lang->story->day;?></td>
                     <?php endif;?>
                 </tr>
                 <?php $storyCount++;?>

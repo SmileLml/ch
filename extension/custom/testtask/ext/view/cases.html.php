@@ -54,15 +54,16 @@
       $vars = "taskID=$task->id&browseType=$browseType&param=$param&orderBy=%s&recToal={$pager->recTotal}&recPerPage={$pager->recPerPage}";
       if($this->app->tab == 'chteam') $vars .= "&pageID=1&chproject={$chprojectID}";
 
-      $canBatchEdit   = common::hasPriv('testcase', 'batchEdit');
-      $canBatchUnlink = common::hasPriv('testtask', 'batchUnlinkCases');
-      $canBatchAssign = common::hasPriv('testtask', 'batchAssign');
-      $canBatchRun    = common::hasPriv('testtask', 'batchRun');
+      $canBatchEdit          = common::hasPriv('testcase', 'batchEdit');
+      $canBatchUnlink        = common::hasPriv('testtask', 'batchUnlinkCases');
+      $canBatchAssign        = common::hasPriv('testtask', 'batchAssign');
+      $canBatchRun           = common::hasPriv('testtask', 'batchRun');
+      $canBatchConfirmChange = common::hasPriv('testtask', 'batchConfirmChange');
 
-      $canBatchAction = ($canBeChanged and ($canBatchEdit or $canBatchUnlink or $canBatchAssign or $canBatchRun));
+      $canBatchAction = ($canBeChanged and ($canBatchEdit or $canBatchUnlink or $canBatchAssign or $canBatchRun or $canBatchConfirmChange));
 
-      if($useDatatable) include '../../common/view/datatable.html.php';
-      if(!$useDatatable) include '../../common/view/tablesorter.html.php';
+      if($useDatatable) include  $app->getModuleRoot() . 'common/view/datatable.html.php';
+      if(!$useDatatable) include $app->getModuleRoot() . 'common/view/tablesorter.html.php';
 
       $config->testcase->datatable->defaultField = $config->testtask->datatable->defaultField;
       $config->testcase->datatable->fieldList['actions']['width'] = '120';
@@ -147,6 +148,13 @@
           if($canBatchRun)
           {
               echo html::commonButton($lang->testtask->runCase, "onclick=\"confirmAction()\"");
+          }
+
+          if($canBatchConfirmChange)
+          {
+              $actionLink = $this->createLink('testtask', 'batchConfirmChangeCases', "taskID=$task->id");
+
+              echo html::commonButton($lang->testtask->confirmChange, "onclick=\"setFormAction('$actionLink')\"");
           }
           ?>
         </div>

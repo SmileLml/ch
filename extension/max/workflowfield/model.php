@@ -511,11 +511,14 @@ class workflowfieldModel extends model
         {
             if(empty($field->sql) or empty($field->sqlVars)) $field = $this->processFieldOptions($field);
 
-            $options = $this->getOptionsBySql($field->sql, $field->sqlVars);
+            $options = $this->getOptionsBySql($field->sql, $field->sqlVars, $keys);
         }
         elseif($field->options == 'user')
         {
-            $options = $this->loadModel('user')->getDeptPairs('noclosed,nodeleted,noforbidden');
+            $params = 'noclosed,nodeleted,noforbidden';
+            if($this->app->rawModule == 'projectapproval' and $this->app->rawMethod == 'view' && is_array($keys)) $params = 'noclosed,noforbidden,members:' . implode(',', $keys);
+
+            $options = $this->loadModel('user')->getDeptPairs($params);
         }
         elseif($field->options == 'dept')
         {
@@ -617,10 +620,11 @@ class workflowfieldModel extends model
      *
      * @param  string $sql
      * @param  array  $sqlVars
+     * @param  array  $keys
      * @access public
      * @return array
      */
-    public function getOptionsBySql($sql = '', $sqlVars = array())
+    public function getOptionsBySql($sql = '', $sqlVars = array(), $keys = [])
     {
         if(is_array($sqlVars))
         {
@@ -642,13 +646,31 @@ class workflowfieldModel extends model
                 {
                     $key   = current($data);
                     $value = next($data);
+
                     $options[$key] = $value;
                 }
                 elseif(count($data) > 0)
                 {
                     $key   = current($data);
                     $value = current($data);
+
                     $options[$key] = $value;
+                }
+            }
+
+            if($keys && $this->app->rawMethod != 'create')
+            {
+                preg_match('/\bFROM\s+(\w+)\b/i', $sql, $tableMatches);
+                preg_match('/\bselect\s+(\w+)\s*,\s*(\w+)\b/i', $sql, $fieldMatches);
+
+                $tableName  = isset($tableMatches[1]) ? $tableMatches[1] : '';
+                $fieldKey   = isset($fieldMatches[1]) ? $fieldMatches[1] : $fieldKey;
+                $fieldValue = isset($fieldMatches[2]) ? $fieldMatches[2] : $fieldKey;
+
+                if($tableName && $fieldKey)
+                {
+                    $selectedList = $this->dao->select("$fieldKey, $fieldValue")->from($tableName)->where($fieldKey)->in($keys)->fetchPairs();
+                    if($selectedList) $options += $selectedList;
                 }
             }
 

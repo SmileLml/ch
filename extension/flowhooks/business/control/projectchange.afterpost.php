@@ -1,0 +1,2 @@
+<?php
+if($result['result'] == 'success') return $this->send(array('result' => 'success', 'message' => $this->lang->saveSuccess, 'closeModal' => true, 'business' => $dataID, 'budget' => $_POST['developmentBudget'], 'type' => 'projectchange'));

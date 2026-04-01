@@ -33,10 +33,44 @@ class pivot extends control
      * @access public
      * @return void
      */
-    public function preview($dimension = 0, $group = '', $module = 'pivot', $method = '', $params = '')
+    public function preview($dimension = 0, $group = '', $module = 'pivot', $method = '', $params = '', $customDimension = 'team', $recTotal = 0, $recPerPage = 10, $pageID = 1)
     {
         $dimension = $this->loadModel('dimension')->setSwitcherMenu($dimension);
         $this->prepare4Preview($dimension, $group, $module, $method, $params);
+        if($group == 'custom')
+        {
+            $this->app->loadClass('pager', true);
+            $pager  = new pager($recTotal, $recPerPage, $pageID);
+
+            if($method == 'story')
+            {
+                $params = $this->pivot->parseParams($params, $method, $customDimension);
+                $data = $this->pivot->getCustomStoryData($customDimension, $params, $pager);
+                $this->view->params = $params;
+            }
+            if($method == 'bug')
+            {
+                $newParams = $this->pivot->parseBugParams($params, $customDimension);
+                $this->view->newParams = $newParams;
+
+                if($customDimension == 'team' || $customDimension == 'project')
+                {
+                    $newParams['date']['begin'] .= ' 00:00:00';
+                    $newParams['date']['end']   .= ' 23:59:59';
+                }
+                $data = $this->pivot->getCustomBugData($customDimension, $newParams, $pager);
+            }
+            if($method == 'cycle')
+            {
+                $params = $this->pivot->parseParams($params, $method, $customDimension);
+                $data = $this->pivot->getCustomCycleData($customDimension, $params, $pager);
+                $this->view->params = $params;
+            }
+
+            $this->view->data  = $data;
+            $this->view->pager = $pager;
+            $this->view->customDimension = $customDimension;
+        }
         $this->display();
     }
 
@@ -317,6 +351,27 @@ class pivot extends control
         }
 
         $this->pivot->buildPivotTable($data, $configs, $page);
+    }
+
+    public function ajaxGetStoryList()
+    {
+        $storyIDs = $this->post->storyIDs;
+        $stories = $this->dao->select('*')
+            ->from(TABLE_STORY)
+            ->where('id')->in($storyIDs)
+            ->fetchAll();
+
+        $this->app->loadLang('story');
+        foreach($stories as $story)
+        {
+            $link = helper::createLink('story', 'view', "id=$story->id");
+            $story->title  = html::a($link, $story->title);
+            $story->status = $this->lang->story->statusList[$story->status];
+            $story->stage  = $this->lang->story->stageList[$story->stage];
+            $story->pri    = "<span class='" . ($story->pri ? "label-pri label-pri-" . $story->pri : '') . "' title='" . zget($this->lang->story->priList, $story->pri, $story->pri) . "'>" . zget($this->lang->story->priList, $story->pri, $story->pri) . "</span>";
+        }
+
+        echo json_encode($stories);
     }
 
     /**

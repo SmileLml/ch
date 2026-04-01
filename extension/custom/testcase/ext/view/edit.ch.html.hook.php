@@ -12,6 +12,6 @@ $('#execution').on('change', function()
 });
 $('.detail').eq(8).find('tbody tr:not(.hide):last').remove();
 $('.detail').eq(8).find('tbody tr:not(.hide):last').remove();
-setStories();
+//setStories();
 </script>
 <?php endif;?>

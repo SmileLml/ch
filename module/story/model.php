@@ -259,13 +259,6 @@ class storyModel extends model
         $extra = str_replace(array(',', ' '), array('&', ''), $extra);
         parse_str($extra, $output);
 
-        if(isset($_POST['reviewer'])) $_POST['reviewer'] = array_filter($_POST['reviewer']);
-        if(!$this->post->needNotReview and empty($_POST['reviewer']))
-        {
-            dao::$errors['reviewer'] = sprintf($this->lang->error->notempty, $this->lang->story->reviewers);
-            return false;
-        }
-
         $now   = helper::now();
         $story = fixer::input('post')
             ->cleanInt('product,module,pri,plan')
@@ -289,6 +282,15 @@ class storyModel extends model
             ->remove('files,labels,reviewer,needNotReview,newStory,uid,contactListMenu,URS,region,lane,ticket,branches,modules,plans')
             ->get();
 
+        if($story->business)
+        {
+            list($result, $message) = $this->loadModel('story')->checkBusinessResidueEstimate($story->business);
+            if(!$result)
+            {
+                dao::$errors[] = $this->lang->story->businessError;
+                return false;
+            }
+        }
         /* Check repeat story. */
         $result = $this->loadModel('common')->removeDuplicate('story', $story, "product={$story->product}");
         if(isset($result['stop']) and $result['stop'])
@@ -296,7 +298,7 @@ class storyModel extends model
             dao::$errors[] = $this->lang->story->title . $this->lang->story->reasonList['duplicate'] . ',' . $this->lang->story->id . $result['duplicate'];
             return false;
         }
-        if($story->status != 'draft' and $this->checkForceReview()) $story->status = 'reviewing';
+        if($story->status != 'draft' and $this->checkForceReview() and $this->app->tab != 'project' and $this->app->tab != 'product') $story->status = 'reviewing';
         $story = $this->loadModel('file')->processImgURL($story, $this->config->story->editor->create['id'], $this->post->uid);
 
         $product = $this->loadModel('product')->getById($story->product);
@@ -417,7 +419,7 @@ class storyModel extends model
                 if($executionID != 0)
                 {
                     $this->linkStory($executionID, $this->post->product, $storyID);
-                    if(in_array($this->config->systemMode, array('ALM', 'PLM')) and $executionID != $this->session->project) $this->linkStory($this->session->project, $this->post->product, $storyID);
+                    if(in_array($this->config->systemMode, array('ALM', 'PLM')) and $executionID != $this->session->project and $this->app->tab != 'project' and $this->app->tab != 'product') $this->linkStory($this->session->project, $this->post->product, $storyID);
 
                     $this->loadModel('kanban');
 
@@ -2815,11 +2817,16 @@ class storyModel extends model
         $storyID = (int)$storyID;
         $account = $this->app->user->account;
 
+        $story       = $this->dao->findById($storyID)->from(TABLE_STORY)->fetch();
+        $noSetStages = array('verified', 'released', 'closed');
+
+        if(($this->app->rawModule == 'release' || $this->app->rawModule == 'projectrelease') && ($this->app->rawMethod == 'linkstory' || $this->app->rawMethod == 'unlinkstory') && in_array($story->stage, $noSetStages)) return;
+
         /* Get projects which status is doing. */
         $oldStages = $this->dao->select('*')->from(TABLE_STORYSTAGE)->where('story')->eq($storyID)->fetchAll('branch');
+        if($oldStages)
         $this->dao->delete()->from(TABLE_STORYSTAGE)->where('story')->eq($storyID)->exec();
 
-        $story = $this->dao->findById($storyID)->from(TABLE_STORY)->fetch();
         if(!empty($story->stagedBy) and $story->status != 'closed') return false;
 
         $product    = $this->dao->findById($story->product)->from(TABLE_PRODUCT)->fetch();
@@ -2968,7 +2975,7 @@ class storyModel extends model
             $stages[$branch] = $stage;
         }
 
-        $releases = $this->dao->select('*')->from(TABLE_RELEASE)->where("CONCAT(',', stories, ',')")->like("%,$storyID,%")->andWhere('deleted')->eq(0)->fetchPairs('branch', 'branch');
+        $releases = $this->dao->select('*')->from(TABLE_RELEASE)->where("CONCAT(',', stories, ',')")->like("%,$storyID,%")->andWhere('deleted')->eq(0)->andWhere('status')->eq('normal')->fetchPairs('branch', 'branch');
         foreach($releases as $branches)
         {
             $branches = trim($branches, ',');
@@ -5388,7 +5395,7 @@ class storyModel extends model
                 echo '</span>';
                 break;
             case 'estimate':
-                echo $story->estimate . $this->config->hourUnit;
+                echo $story->estimate . $this->lang->story->day;
                 break;
             case 'stage':
                 echo $this->lang->story->stageList[$maxStage];
@@ -5570,7 +5577,6 @@ class storyModel extends model
 
             $forceUsers .= "," . implode(',', array_keys($users));
         }
-
         $forceReview = $this->config->story->needReview == 0 ? strpos(",{$forceUsers},", ",{$this->app->user->account},") !== false : strpos(",{$forceUsers},", ",{$this->app->user->account},") === false;
 
         return $forceReview;
@@ -6785,7 +6791,6 @@ class storyModel extends model
     {
         $setting   = $this->loadModel('datatable')->getSetting('product');
         $fieldList = $this->config->story->datatable->fieldList;
-
         foreach($fieldList as $field => $items)
         {
             if(isset($items['title'])) continue;

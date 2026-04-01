@@ -51,3 +51,10 @@ $lang->workflowdatasource->langList['userStatus'] = '用户状态';
 $lang->workflowdatasource->langList['feedbackStatus'] = '反馈状态';
 
 $lang->workflowdatasource->langList['testsuiteAuth']  = '套件权限';
+
+$lang->workflowdatasource->langList['demandpoolStatus'] = '需求池状态';
+
+$lang->workflowdatasource->langList['demandCategory'] = '原始需求类别';
+$lang->workflowdatasource->langList['demandSource']   = '原始需求来源';
+$lang->workflowdatasource->langList['demandStatus']   = '原始需求状态';
+$lang->workflowdatasource->langList['demandStage']   = '原始需求所属阶段';

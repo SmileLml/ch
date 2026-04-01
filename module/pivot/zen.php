@@ -19,7 +19,7 @@ class pivotZen extends pivot
         if(!$groupID) $groupID = $this->getDefaultGroup($dimension);
         if(!$module || !$method) list($module, $method, $params) = $this->getDefaultPivotParams($dimension, $groupID);
 
-        if(!empty($module) && !empty($method) && $method != 'show' && !common::hasPriv($module, $method)) $this->loadModel('common')->deny('pivot', $method);
+        if(!empty($module) && !empty($method) && $method != 'show' && $groupID != 'custom' && !common::hasPriv($module, $method)) $this->loadModel('common')->deny('pivot', $method);
 
         $this->setFeatureBar($dimension);
 

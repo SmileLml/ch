@@ -401,3 +401,115 @@ $lang->datepicker->dpText->TEXT_WEEK_MONDAY = '本周一';
 $lang->datepicker->dpText->TEXT_WEEK_SUNDAY = '本周日';
 $lang->datepicker->dpText->TEXT_MONTH_BEGIN = '本月初';
 $lang->datepicker->dpText->TEXT_MONTH_END   = '本月末';
+
+$lang->pivot->customFeature   = '敏捷度量';
+$lang->pivot->customDimension = '统计维度';
+
+$lang->pivot->customList = array();
+$lang->pivot->customList['story'] = '需求相关数据';
+$lang->pivot->customList['bug']   = '缺陷相关数据';
+$lang->pivot->customList['cycle'] = '平均周期';
+
+$lang->pivot->story = new stdclass();
+$lang->pivot->story->dimensions = array();
+$lang->pivot->story->dimensions['team']    = '团队';
+$lang->pivot->story->dimensions['sprint']  = '迭代';
+$lang->pivot->story->dimensions['project'] = '项目';
+
+$lang->pivot->story->filters = array();
+$lang->pivot->story->filters['team']          = '所属团队';
+$lang->pivot->story->filters['sprint']        = '迭代名称';
+$lang->pivot->story->filters['sprintStatus']  = '迭代状态';
+$lang->pivot->story->filters['program']       = '所属项目集';
+$lang->pivot->story->filters['project']       = '项目名称';
+$lang->pivot->story->filters['projectStatus'] = '项目状态';
+$lang->pivot->story->filters['projectedType'] = '立项类型';
+$lang->pivot->story->filters['stage']         = '需求截止阶段';
+$lang->pivot->story->filters['date']          = '时间周期';
+$lang->pivot->story->filters['type']          = '需求类型';
+
+$lang->pivot->story->cols = array();
+$lang->pivot->story->cols['team']          = '团队名称';
+$lang->pivot->story->cols['execution']     = '迭代名称';
+$lang->pivot->story->cols['program']       = '所属项目集';
+$lang->pivot->story->cols['project']       = '项目名称';
+$lang->pivot->story->cols['storyCount']    = '需求吞吐量';
+$lang->pivot->story->cols['storyEstimate'] = '需求规模/%s速率（计划人天）';
+$lang->pivot->story->cols['consumed']      = '实际消耗/%s速率（实际人天）';
+$lang->pivot->story->cols['productivity']  = '%s生产率';
+$lang->pivot->story->cols['finishRate']    = '需求完成率';
+$lang->pivot->story->cols['participants']  = '实际参与人数';
+$lang->pivot->story->cols['load']          = '计划饱和度';
+$lang->pivot->story->cols['planRate']      = '人均速率（按计划人天）';
+$lang->pivot->story->cols['actualRate']    = '人均速率（按实际消耗）';
+
+$lang->pivot->bugCustom = new stdclass();
+$lang->pivot->bugCustom->filters = array();
+$lang->pivot->bugCustom->filters['program']         = '所属项目集';
+$lang->pivot->bugCustom->filters['project']         = '项目名称';
+$lang->pivot->bugCustom->filters['projectStatus']   = '项目状态';
+$lang->pivot->bugCustom->filters['proposalType']    = '立项类型';
+$lang->pivot->bugCustom->filters['team']            = '所属团队';
+$lang->pivot->bugCustom->filters['executionName']   = '迭代名称';
+$lang->pivot->bugCustom->filters['executionStatus'] = '迭代状态';
+$lang->pivot->bugCustom->filters['bugType']         = '缺陷类型';
+$lang->pivot->bugCustom->filters['date']            = '时间周期';
+
+$lang->pivot->bugCustom->commonCols = array();
+$lang->pivot->bugCustom->commonCols['newTestBug']         = '新增测试缺陷';
+$lang->pivot->bugCustom->commonCols['newEffTestBug']      = '新增有效测试缺陷';
+$lang->pivot->bugCustom->commonCols['newOnlineBug']       = '新增线上缺陷';
+$lang->pivot->bugCustom->commonCols['newEffBug']          = '新增有效缺陷';
+$lang->pivot->bugCustom->commonCols['newEffTestCloseBug'] = '新增有效测试缺陷关闭数';
+$lang->pivot->bugCustom->commonCols['newEffCloseBug']     = '新增有效缺陷关闭数';
+$lang->pivot->bugCustom->commonCols['newEffCloseBugRate'] = '新增有效缺陷关闭率';
+$lang->pivot->bugCustom->commonCols['effCloseBug']        = '有效缺陷关闭数';
+
+$lang->pivot->bugCustom->cols = array();
+$lang->pivot->bugCustom->cols['team']['team']               = '团队名称';
+$lang->pivot->bugCustom->cols['team'] = array_merge($lang->pivot->bugCustom->cols['team'], $lang->pivot->bugCustom->commonCols);
+
+$lang->pivot->bugCustom->cols['sprint']['team'] = '团队名称';
+$lang->pivot->bugCustom->cols['sprint']['name'] = '迭代名称';
+$lang->pivot->bugCustom->cols['sprint'] = array_merge($lang->pivot->bugCustom->cols['sprint'], $lang->pivot->bugCustom->commonCols);
+
+$lang->pivot->bugCustom->cols['project']['projectName'] = '项目名称';
+$lang->pivot->bugCustom->cols['project'] = array_merge($lang->pivot->bugCustom->cols['project'], $lang->pivot->bugCustom->commonCols);
+
+$lang->pivot->cycle = new stdclass();
+$lang->pivot->cycle->dimensions = array();
+$lang->pivot->cycle->dimensions['team']    = '团队';
+$lang->pivot->cycle->dimensions['project'] = '项目';
+
+$lang->pivot->cycle->filters = array();
+$lang->pivot->cycle->filters['team']          = '所属团队';
+$lang->pivot->cycle->filters['program']       = '所属项目集';
+$lang->pivot->cycle->filters['project']       = '项目名称';
+$lang->pivot->cycle->filters['projectStatus'] = '项目状态';
+$lang->pivot->cycle->filters['projectedType'] = '立项类型';
+$lang->pivot->cycle->filters['stageBegin']    = '需求开始阶段';
+$lang->pivot->cycle->filters['stageEnd']      = '需求截止阶段';
+$lang->pivot->cycle->filters['bugOpen']       = '缺陷发现阶段';
+$lang->pivot->cycle->filters['bugBegin']      = '缺陷开始阶段';
+$lang->pivot->cycle->filters['bugEnd']        = '缺陷截止阶段';
+$lang->pivot->cycle->filters['date']          = '时间周期';
+$lang->pivot->cycle->filters['type']          = '需求类型';
+
+$lang->pivot->cycle->cols = array();
+$lang->pivot->cycle->cols['team']          = '团队名称';
+$lang->pivot->cycle->cols['program']       = '所属项目集';
+$lang->pivot->cycle->cols['project']       = '项目名称';
+$lang->pivot->cycle->cols['storyCount']    = '需求条目';
+$lang->pivot->cycle->cols['storyCycle']    = '需求平均周期';
+$lang->pivot->cycle->cols['bugCount']      = '缺陷条目';
+$lang->pivot->cycle->cols['bugCycle']      = '缺陷平均周期';
+
+$lang->pivot->cycle->drill = new stdclass();
+$lang->pivot->cycle->drill->title      = '下钻列表';
+$lang->pivot->cycle->drill->id         = 'ID';
+$lang->pivot->cycle->drill->name       = '名称';
+$lang->pivot->cycle->drill->bug        = '缺陷';
+$lang->pivot->cycle->drill->story      = '需求';
+$lang->pivot->cycle->drill->beginStage = '阶段开始时间';
+$lang->pivot->cycle->drill->endStage   = '阶段结束时间';
+$lang->pivot->cycle->drill->days       = '持续时长';

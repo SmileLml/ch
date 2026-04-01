@@ -200,7 +200,7 @@
                 </td>
                 <td><?php echo zget($users, $story->openedBy);?></td>
                 <td><?php echo zget($users, $story->assignedTo);?></td>
-                <td class='text-right' title="<?php echo $story->estimate . ' ' . $lang->hourCommon;?>"><?php echo $story->estimate . $config->hourUnit;?></td>
+                <td class='text-right' title="<?php echo $story->estimate . ' ' . $lang->story->day;?>"><?php echo $story->estimate . $lang->story->day;?></td>
                 <td><?php echo $lang->story->stageList[$story->stage];?></td>
                 <td class='c-actions'>
                   <?php

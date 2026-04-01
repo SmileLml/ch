@@ -11,6 +11,10 @@ if(isset($twins))
     <li class='active'><a data-toggle='tab' href='#affectedProjects'><?php echo $lang->story->affectedProjects;?> <?php $count = count($story->executions); if($count > 0) echo "<span class='label label-danger label-badge label-circle'>" . $count . "</span>" ?></a></li>
     <li><a data-toggle='tab' href='#affectedBugs'><?php echo $lang->story->affectedBugs;?> <?php $count = count($story->bugs); if($count > 0) echo "<span class='label label-danger label-badge label-circle'>" . $count . "</span>" ?></a></li>
     <li><a data-toggle='tab' href='#affectedCases'><?php echo $lang->story->affectedCases;?> <?php $count = count($story->cases); if($count > 0) echo "<span class='label label-danger label-badge label-circle'>" . $count . "</span>" ?></a></li>
+    <?php if($story->type == 'requirement'):?>
+    <li><a data-toggle='tab' href='#affectedStory'><?php echo $lang->story->affectedStory;?> <?php $count = count($story->affectedStory); if($count > 0) echo "<span class='label label-danger label-badge label-circle'>" . $count . "</span>" ?></a></li>
+    <li><a data-toggle='tab' href='#affectedTask'><?php echo $lang->story->affectedTask;?> <?php $count = count($story->affectedTask); if($count > 0) echo "<span class='label label-danger label-badge label-circle'>" . $count . "</span>" ?></a></li>
+    <?php endif;?>
     <li><a data-toggle='tab' href='#affectedTwins'><?php if(isset($twins) and count($twins) > 0) echo $lang->story->affectedTwins;?> <?php if(isset($twins) and count($twins) > 0) echo "<span class='label label-danger label-badge label-circle'>" . count($twins) . "</span>" ?></a></li>
   </ul>
   <div class='tab-content'>
@@ -107,6 +111,74 @@ if(isset($twins))
         </tbody>
       </table>
     </div>
+    <?php if($story->type == 'requirement'):?>
+    <div class='tab-pane' id='affectedStory'>
+      <table class='table'>
+        <thead>
+          <tr class='text-center'>
+            <th class='c-id'><?php echo $lang->idAB;?></th>
+            <th class='text-left'><?php echo $lang->story->affectedName;?></th>
+            <th class='c-status'><?php echo $lang->statusAB;?></th>
+            <th class='c-user'><?php echo $lang->testcase->pri;?></th>
+            <th class='c-user'><?php echo $lang->testcase->openedBy;?></th>
+          </tr>
+        </thead>
+        <tbody class='<?php if(count($story->affectedStory) > $config->story->affectedFixedNum)  echo "linkbox";?>'>
+        <?php foreach($story->affectedStory as $affectedStory):?>
+          <tr class='text-center'>
+            <td><?php echo $affectedStory->id;?></td>
+            <?php $params = $this->app->tab == 'project' ? "storyID=$affectedStory->id&project={$this->session->project}" : "storyID=$affectedStory->id"?>
+            <td class='text-left'><?php echo html::a($this->createLink('projectstory', 'view', $params
+          ), $affectedStory->title, '_blank');?></td>
+            <td>
+              <span class='status-case status-<?php echo $case->status?>'><?php echo $story->URChanged ? $this->lang->story->URChanged : $this->processStatus('story', $affectedStory);?></span>
+            </td>
+            <td><?php echo "<span class='" . ($story->pri ? "label-pri label-pri-" . $story->pri : '') . "' title='" . zget($this->lang->story->priList, $story->pri, $story->pri) . "'>" . zget($this->lang->story->priList, $story->pri, $story->pri) . "</span>";?></td>
+            <td><?php echo zget($users, $story->openedBy);?></td>
+          </tr>
+          <?php endforeach;?>
+        </tbody>
+      </table>
+    </div>
+    <div class='tab-pane' id='affectedTask'>
+      <table class='table'>
+        <thead>
+          <tr class='text-center'>
+            <th class='c-id'><?php echo $lang->idAB;?></th>
+            <th class='text-left'><?php echo $lang->task->name;?></th>
+            <th class='c-status'><?php echo $lang->statusAB;?></th>
+            <th class='c-user'><?php echo $lang->task->pri;?></th>
+            <th class='c-user'><?php echo $lang->task->openedBy;?></th>
+          </tr>
+        </thead>
+        <tbody class='<?php if(count($story->affectedTask) > $config->story->affectedFixedNum)  echo "linkbox";?>'>
+        <?php foreach($story->affectedTask as $affectedTask):?>
+          <tr class='text-center'>
+            <td><?php echo $affectedTask->id;?></td>
+            <td class='text-left'><?php echo html::a($this->createLink('task', 'view', "taskID=$affectedTask->id"), $affectedTask->name, '_blank');?></td>
+            <td>
+              <span class='status-case status-<?php echo $affectedTask->status?>'>
+                <?php
+                $storyChanged   = (!empty($task->storyStatus) and $task->storyStatus == 'active' and $task->latestStoryVersion > $task->storyVersion and !in_array($task->status, array('cancel', 'closed')));
+                echo $storyChanged ? "<span class='status-story status-changed' title='{$this->lang->story->changed}'>{$this->lang->story->changed}</span>" : "<span class='status-task status-{$task->status}' title='{$this->processStatus('task', $task)}'> " . $this->processStatus('task', $task) . "</span>";
+                ?>
+              </span>
+            </td>
+            <td>
+              <?php
+              $priClass = $affectedTask->pri ? "label-pri label-pri-{$affectedTask->pri}" : '';
+              echo "<span class='$priClass' title='" . zget($this->lang->task->priList, $affectedTask->pri, $affectedTask->pri) . "'>";
+              echo zget($this->lang->task->priList, $affectedTask->pri, $affectedTask->pri);
+              echo "</span>";
+              ?>
+            </td>
+            <td><?php echo zget($users, $affectedTask->openedBy);?></td>
+          </tr>
+          <?php endforeach;?>
+        </tbody>
+      </table>
+    </div>
+    <?php endif;?>
     <?php if(isset($twins)):?>
     <div class='tab-pane' id='affectedTwins'>
       <table class='table'>

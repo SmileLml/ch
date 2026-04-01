@@ -1,23 +1,24 @@
 var mindmapMgr = undefined;
 
-$(document).ready(function()
+$(document).ready(function ()
 {
     mindmapMgr = new ztmindmap.Wraper({
         product: productID,
         branch: branch,
-        typeKeys:{
+        typeKeys: {
             module: userConfig_module,
             scene: userConfig_scene,
             testcase: userConfig_case,
             stepGroup: userConfig_group,
-            pri: userConfig_pri
+            pri: userConfig_pri,
+            precondition: userConfig_precondition
         }
     });
 
-    $.get(createLink('testcase', 'getXmindImport'),function(res)
+    $.get(createLink('testcase', 'getXmindImport'), function (res)
     {
         var data = JSON.parse(res);
-        if(ztmindmap.isArray(data))
+        if (ztmindmap.isArray(data))
         {
             var rootTopic = data[0].rootTopic;
             mindmapMgr.initFromJSON(rootTopic);
@@ -25,28 +26,28 @@ $(document).ready(function()
         else
         {
             var sheet = data["xmap-content"]["sheet"];
-            if(ztmindmap.isArray(sheet)) sheet = sheet[0];
+            if (ztmindmap.isArray(sheet)) sheet = sheet[0];
             mindmapMgr.initFromSheet(sheet);
         }
 
         mindmapMgr.render();
     });
 
-    $("#xmindmapSave").click(function(e)
+    $("#xmindmapSave").click(function (e)
     {
         var data = mindmapMgr.toJson();
-        if(data.testcaseList.length == 0)
+        if (data.testcaseList.length == 0)
         {
             alert(jsLng.caseNotExist);
             return;
         }
 
-        $.post(createLink('testcase', 'saveXmindImport'),data,function(res)
+        $.post(createLink('testcase', 'saveXmindImport'), data, function (res)
         {
             var res = JSON.parse(res);
-            if(res.result != "success")
+            if (res.result != "success")
             {
-                if(res.message && res.message !== '')
+                if (res.message && res.message !== '')
                 {
                     alert(res.message);
                     return;
@@ -58,30 +59,42 @@ $(document).ready(function()
             {
                 //var params = "productID=" + productID + "&branch=" + branch;
                 var params = "productID=" + productID;
-                parent.location = createLink('testcase', 'browse',params);
+                parent.location = createLink('testcase', 'browse', params);
             }
         });
     })
 });
 
-if(window.ztmindmap == undefined) window.ztmindmap = {};
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
-ztmindmap.ModuleManager = function(wraper){ this.wraper = wraper;}
-ztmindmap.ModuleManager.prototype.clearNodeDisplay = function($node, data){ $node.find(".suffix").hide();};
-
-ztmindmap.ModuleManager.prototype.getContextMenuList = function(data)
+ztmindmap.ModuleManager = function (wraper)
 {
-    if(data.$.typeBy.import == true) return [];
+    this.wraper = wraper;
+}
+ztmindmap.ModuleManager.prototype.clearNodeDisplay = function ($node, data)
+{
+    $node.find(".suffix").hide();
+};
+
+ztmindmap.ModuleManager.prototype.getContextMenuList = function (data)
+{
+    if (data.$.typeBy.import == true) return [];
 
     //如果上一个节点时模型，当前节点可以在 ”场景“ 和 ”测试用例间切换“
     var parentNode = this.wraper.findParentNode(data);
-    if(parentNode.$.type == "module")
+    if (parentNode.$.type == "module")
     {
         var menus = [];
 
-        if(data.$.type == "testcase" || data.$.type == undefined) menus.push({action:"addScene", label:jsLng.set2Scene});
-        if(data.$.type == "scene" || data.$.type == undefined) menus.push({action:"addTestcase", label:jsLng.set2Testcase});
-        if(data.$.type != undefined) menus.push({action:"delType", label:jsLng.clearSetting});
+        if (data.$.type == "testcase" || data.$.type == undefined) menus.push({
+            action: "addScene",
+            label: jsLng.set2Scene
+        });
+        if (data.$.type == "scene" || data.$.type == undefined) menus.push({
+            action: "addTestcase",
+            label: jsLng.set2Testcase
+        });
+        if (data.$.type != undefined) menus.push({action: "delType", label: jsLng.clearSetting});
 
         return menus;
     }
@@ -89,53 +102,55 @@ ztmindmap.ModuleManager.prototype.getContextMenuList = function(data)
     return [];
 };
 
-ztmindmap.ModuleManager.prototype.delType = function($node,data)
+ztmindmap.ModuleManager.prototype.delType = function ($node, data)
 {
-    this.wraper.changeNodeType($node,data,undefined);
-    this.wraper.clearTypeAfter($node,data);
+    this.wraper.changeNodeType($node, data, undefined);
+    this.wraper.clearTypeAfter($node, data);
     //this.refreshDisplay();
 }
 
-ztmindmap.ModuleManager.prototype.addScene = function($node,data)
+ztmindmap.ModuleManager.prototype.addScene = function ($node, data)
 {
     var moduleData = this.wraper.findParentData(data);
     data.$.moduleID = moduleData.$.moduleID;
-    this.wraper.changeNodeType($node,data,"scene");
-    this.wraper.clearTypeAfter($node,data);
+    this.wraper.changeNodeType($node, data, "scene");
+    this.wraper.clearTypeAfter($node, data);
     //this.refreshDisplay();
 }
 
-ztmindmap.ModuleManager.prototype.addTestcase = function($node,data)
+ztmindmap.ModuleManager.prototype.addTestcase = function ($node, data)
 {
-    this.wraper.changeNodeType($node,data,"testcase");
-    this.wraper.clearTypeAfter($node,data);
+    this.wraper.changeNodeType($node, data, "testcase");
+    this.wraper.clearTypeAfter($node, data);
     //this.refreshDisplay();
 }
 
-ztmindmap.ModuleManager.prototype.refreshNodeDisplay = function($node, data)
+ztmindmap.ModuleManager.prototype.refreshNodeDisplay = function ($node, data)
 {
     $node.find(".suffix").hide();
 
-    if(data.$.moduleID != undefined)
+    if (data.$.moduleID != undefined)
     {
         $node.find(".suffix").show();
         $node.find(".suffix").find(".content").html(this.wraper.disKeys['module'] + ":" + data.$.moduleID);
     }
 }
 
-ztmindmap.ModuleManager.prototype.refreshDisplay = function(){ this.wraper.refreshDisplay();};
+ztmindmap.ModuleManager.prototype.refreshDisplay = function ()
+{
+    this.wraper.refreshDisplay();
+};
 
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
-if(window.ztmindmap == undefined) window.ztmindmap = {};
-
-ztmindmap.SceneManager = function(wraper)
+ztmindmap.SceneManager = function (wraper)
 {
     this.wraper = wraper;
     this.proprMgr = new ztmindmap.SceneProperyManager(this);
     this.proprMgr.init();
 };
 
-ztmindmap.SceneManager.prototype.clearNodeDisplay = function($node, data)
+ztmindmap.SceneManager.prototype.clearNodeDisplay = function ($node, data)
 {
     $node.find(".suffix").hide();
     $node.find(".scene-indicator").hide();
@@ -146,79 +161,88 @@ ztmindmap.SceneManager.prototype.clearNodeDisplay = function($node, data)
     $node.tooltip('destroy');
 };
 
-ztmindmap.SceneManager.prototype.refreshNodeDisplay = function($node, data)
+ztmindmap.SceneManager.prototype.refreshNodeDisplay = function ($node, data)
 {
     $node.find(".scene-indicator").show();
 
     $node.find(".scene-indicator").removeClass("scene-indicator-yes");
 
-    if(data.$.moduleID != undefined)
+    if (data.$.moduleID != undefined)
     {
-        $node.attr("title",data.tooltip);
+        $node.attr("title", data.tooltip);
         $node.tooltip();
 
         $node.find(".scene-indicator").addClass("scene-indicator-yes");
     }
 
-    if(data.$.sceneID != undefined)
+    if (data.$.sceneID != undefined)
     {
         $node.find(".suffix").show();
         $node.find(".suffix").find(".content").html(this.wraper.disKeys['scene'] + ":" + data.$.sceneID);
     }
 };
 
-ztmindmap.SceneManager.prototype.getContextMenuList = function(data)
+ztmindmap.SceneManager.prototype.getContextMenuList = function (data)
 {
     var parentNode = this.wraper.findParentNode(data);
-    if(parentNode.$.type == "scene" && (data.$.type != "testcase" && data.$.type != "scene")) 
-        return [{action:"addTestcase", label:jsLng.set2Testcase}];
+    if (parentNode.$.type == "scene" && (data.$.type != "testcase" && data.$.type != "scene"))
+        return [{action: "addTestcase", label: jsLng.set2Testcase}];
 
-    if(data.$.typeBy.import == true || data.$.type != "scene") return [];
+    if (data.$.typeBy.import == true || data.$.type != "scene") return [];
 
     //如果有父场景(包括父父节点)，当前节点禁止设置所属模块，只能最前面的场景节点设置
     var parents = this.wraper.findParentNodes(data);
-    for(var i=0;i<parents.length;i++)
+    for (var i = 0; i < parents.length; i++)
     {
         var item = parents[i];
-        if(item.$.type == "scene") return [];
+        if (item.$.type == "scene") return [];
     }
 
-    return [{action:"configModule", label:jsLng.setModule}];
+    return [{action: "configModule", label: jsLng.setModule}];
 };
 
-ztmindmap.SceneManager.prototype.addTestcase = function($node,data)
+ztmindmap.SceneManager.prototype.addTestcase = function ($node, data)
 {
-    this.wraper.changeNodeType($node,data,"testcase");
-    this.wraper.clearTypeAfter($node,data);
+    this.wraper.changeNodeType($node, data, "testcase");
+    this.wraper.clearTypeAfter($node, data);
     //this.refreshDisplay();
 }
 
-ztmindmap.SceneManager.prototype.configModule = function($node,data){ this.proprMgr.show($node,data);};
-
-ztmindmap.SceneManager.prototype.refreshDisplay = function(){ this.wraper.refreshDisplay();}
-
-ztmindmap.SceneProperyManager = function(mgr)
+ztmindmap.SceneManager.prototype.configModule = function ($node, data)
 {
-    this.$modal = undefined;
-    this.$node  = undefined;
-    this.data   = undefined;
-    this.mgr    = mgr;
+    this.proprMgr.show($node, data);
 };
 
-ztmindmap.SceneProperyManager.prototype.init = function()
+ztmindmap.SceneManager.prototype.refreshDisplay = function ()
+{
+    this.wraper.refreshDisplay();
+}
+
+ztmindmap.SceneProperyManager = function (mgr)
+{
+    this.$modal = undefined;
+    this.$node = undefined;
+    this.data = undefined;
+    this.mgr = mgr;
+};
+
+ztmindmap.SceneProperyManager.prototype.init = function ()
 {
     var that = this;
 
     this.$modal = $('#moduleSelector');
-    this.$modal.find("#sceneProperySave").on("click",function(){ that.save();});
+    this.$modal.find("#sceneProperySave").on("click", function ()
+    {
+        that.save();
+    });
 };
 
-ztmindmap.SceneProperyManager.prototype.show = function($node,data)
+ztmindmap.SceneProperyManager.prototype.show = function ($node, data)
 {
     this.$node = $node;
-    this.data  = data;
+    this.data = data;
 
-    if(data.$.type != "scene") return;
+    if (data.$.type != "scene") return;
 
     var initScene = data.$.sceneID || 0;
     this.$modal.find("#module").val(initScene);
@@ -226,11 +250,11 @@ ztmindmap.SceneProperyManager.prototype.show = function($node,data)
     this.$modal.modal("show");
 };
 
-ztmindmap.SceneProperyManager.prototype.save = function()
+ztmindmap.SceneProperyManager.prototype.save = function ()
 {
     var moduleID = this.$modal.find("#module").val();
 
-    if(moduleID == undefined || moduleID == 0)
+    if (moduleID == undefined || moduleID == 0)
     {
         alert(jsLng.pickModule);
         return;
@@ -240,30 +264,34 @@ ztmindmap.SceneProperyManager.prototype.save = function()
 
     this.data.$.moduleID = moduleID;
     this.data.tooltip = moduleName;
-    this.mgr.refreshNodeDisplay(this.$node,this.data);
+    this.mgr.refreshNodeDisplay(this.$node, this.data);
 
-    this.mgr.wraper.autoSetSceneModuleAfter(this.$node,this.data);
+    this.mgr.wraper.autoSetSceneModuleAfter(this.$node, this.data);
     this.mgr.refreshDisplay();
 
     this.$modal.modal("hide");
 };
 
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
-if(window.ztmindmap == undefined) window.ztmindmap = {};
+ztmindmap.StepGroupManager = function (wraper)
+{
+    this.wraper = wraper;
+};
 
-ztmindmap.StepGroupManager = function(wraper){ this.wraper = wraper;};
+ztmindmap.StepGroupManager.prototype.clearNodeDisplay = function ($node, data)
+{
+    $node.find(".suffix").hide();
+};
 
-ztmindmap.StepGroupManager.prototype.clearNodeDisplay = function($node, data){ $node.find(".suffix").hide();};
-
-ztmindmap.StepGroupManager.prototype.refreshNodeDisplay = function($node, data)
+ztmindmap.StepGroupManager.prototype.refreshNodeDisplay = function ($node, data)
 {
     $node.find(".suffix").hide();
     $node.find(".suffix").show();
     $node.find(".suffix").find(".content").html(this.wraper.disKeys['stepGroup']);
 };
 
-
-if(window.ztmindmap == undefined) window.ztmindmap = {};
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
 /**
  * 设为场景：节点后面的自动推断,  按照最多4级来判断：测试用例 -> 步骤分组 ->步骤 -> 期望结果
@@ -278,6 +306,7 @@ if(window.ztmindmap == undefined) window.ztmindmap = {};
  * 清除场景： 操作不够明确，无法判断用户意图，这里不提供
  */
 
+// 修改节点模板，添加前置条件相关的CSS类
 ztmindmap.nodeTemplate =
     "<div  data-toggle='tooltip' data-placement='bottom' id='node-{id}' class='mindmap-node' data-type='{type}' data-id='{id}' data-parent='{parent}'>" +
     "   <div class='scene-indicator' style='display:none;'><i class='icon icon-flag'></i></div>" +
@@ -288,51 +317,53 @@ ztmindmap.nodeTemplate =
     "       <div class='btn-toggle'></div>" +
     "   </div>" +
     "   <div class='suffix'><span>[</span><span class='content'>M:10000</span><span>]</span></div>" +
+    "   <div class='precondition-indicator' style='display:none;'><i class='icon icon-info-sign'></i></div>" +
     "</div>";
 
 ztmindmap.defaultTypeKeys = {
     module: "M",
     scene: "S",
     testcase: "C",
-    stepGroup:"G",
-    pri: "P"
+    stepGroup: "G",
+    pri: "P",
+    precondition: "F"  // 添加前置条件关键字
 }
 
-
-ztmindmap.Wraper = function(params)
+ztmindmap.Wraper = function (params)
 {
-    this.data      = undefined;
+    this.data = undefined;
     this.productID = params.product;
-    this.branch    = params.branch;
-    this.typeKeys  = $.extend({},ztmindmap.defaultTypeKeys,params.typeKeys);
-    this.disKeys   = $.extend({},ztmindmap.defaultTypeKeys,params.typeKeys);
+    this.branch = params.branch;
+    this.typeKeys = $.extend({}, ztmindmap.defaultTypeKeys, params.typeKeys);
+    this.disKeys = $.extend({}, ztmindmap.defaultTypeKeys, params.typeKeys);
 
-    for(var key in this.typeKeys) this.typeKeys[key] = this.typeKeys[key].toLowerCase();
+    for (var key in this.typeKeys) this.typeKeys[key] = this.typeKeys[key].toLowerCase();
 
     this.nodeMgrs = {
         scene: new ztmindmap.SceneManager(this),
         testcase: new ztmindmap.TestcaseManager(this),
         module: new ztmindmap.ModuleManager(this),
-        stepGroup: new ztmindmap.StepGroupManager(this)
+        stepGroup: new ztmindmap.StepGroupManager(this),
+        precondition: new ztmindmap.PreconditionManager(this)  // 添加前置条件管理器
     }
 };
 
-ztmindmap.Wraper.prototype.initFromJSON = function(root)
+ztmindmap.Wraper.prototype.initFromJSON = function (root)
 {
-    var rootNode = this.paserXmindNode(root,0);
+    var rootNode = this.paserXmindNode(root, 0);
 
-    this.xmindJson2zendao(root,rootNode,1);
+    this.xmindJson2zendao(root, rootNode, 1);
 
     this.data = rootNode;
 
     this.inheritImportProps();
 }
 
-ztmindmap.Wraper.prototype.initFromSheet = function(sheet)
+ztmindmap.Wraper.prototype.initFromSheet = function (sheet)
 {
     var title = ztmindmap.isObject(sheet.title) ? sheet.title.text : sheet.title;
 
-    var root = {id:sheet.id, text:title,children:[],type:"tmpTop"};
+    var root = {id: sheet.id, text: title, children: [], type: "tmpTop"};
 
     this.xmindXml2zendao(sheet.topic, root, 0);
 
@@ -341,95 +372,103 @@ ztmindmap.Wraper.prototype.initFromSheet = function(sheet)
     this.inheritImportProps();
 };
 
-ztmindmap.Wraper.prototype.render = function()
+ztmindmap.Wraper.prototype.render = function ()
 {
     var that = this;
 
     that.instance = $('#mindmap').mindmap({
-        hSpace:80,
+        hSpace: 80,
         showToggleButton: true,
         nodeTeamplate: ztmindmap.nodeTemplate,
         data: that.data,
         enableDrag: false,
         subLineWidth: 2,
-        afterNodeLoad: function(event)
+        afterNodeLoad: function (event)
         {
             var data = event.data;
             var $node = event.$node;
 
-            that.refreshNodeDisplay($node,data);
-            that.register($node,data);
+            that.refreshNodeDisplay($node, data);
+            that.register($node, data);
 
-            $node.on("contextmenu",function(e)
+            $node.on("contextmenu", function (e)
             {
                 var contextMenuList = that.getContextMenuList(data);
-                if(contextMenuList.length == 0) return;
+                if (contextMenuList.length == 0) return;
 
                 e.preventDefault();
 
-                $.zui.ContextMenu.show(contextMenuList,{event:e,onClickItem:function(item)
-                {
-                    if(item.type == undefined)
-                        that[item.action] && that[item.action]($node,data);
-                    else
-                        that.nodeMgrs[item.type][item.action] && that.nodeMgrs[item.type][item.action]($node, data);
-                }});
+                $.zui.ContextMenu.show(contextMenuList, {
+                    event: e, onClickItem: function (item)
+                    {
+                        if (item.type == undefined)
+                            that[item.action] && that[item.action]($node, data);
+                        else
+                            that.nodeMgrs[item.type][item.action] && that.nodeMgrs[item.type][item.action]($node, data);
+                    }
+                });
             });
         }
     }).data('zui.mindmap');
 
-    for(var key in this.nodeMgrs)
+    for (var key in this.nodeMgrs)
     {
         this.nodeMgrs[key]["init"] && this.nodeMgrs[key]["init"]();
     }
 };
 
-ztmindmap.Wraper.prototype.refreshDisplay = function(){ this.instance.showNode();};
+ztmindmap.Wraper.prototype.refreshDisplay = function ()
+{
+    this.instance.showNode();
+};
 
-ztmindmap.Wraper.prototype.getContextMenuList = function(data)
+ztmindmap.Wraper.prototype.getContextMenuList = function (data)
 {
     var contextMenuList = [];
 
-    if(data.$.typeBy.import == false)
+    if (data.$.typeBy.import == false)
     {
-        if(data.$.type != "scene")
+        if (data.$.type != "scene")
         {
             var parents = this.findParentNodes(data);
             var canChangeToScene = true;
-            for(var i=parents.length-1;i>=0;i--)
+            for (var i = parents.length - 1; i >= 0; i--)
             {
                 var item = parents[i];
-                if(item.$.type == "testcase" || item.$.type == "stepGroup")
+                if (item.$.type == "testcase" || item.$.type == "stepGroup")
                 {
                     canChangeToScene = false;
                     break;
                 }
             }
 
-            if(canChangeToScene == true) contextMenuList.push({ action: "setAsScene", label: jsLng.set2Scene});
+            if (canChangeToScene == true) contextMenuList.push({action: "setAsScene", label: jsLng.set2Scene});
         }
 
-        if(data.$.type == "scene")
+        if (data.$.type == "scene")
         {
             var removeBeforeScene = this.canRemoveSceneBefore(data);
-            var removeAfterScene  = this.canRemoveSceneAfter(data);
+            var removeAfterScene = this.canRemoveSceneAfter(data);
 
-            if(removeBeforeScene == true) contextMenuList.push({ action: "clearBeforeScene", label: jsLng.clearBefore });
+            if (removeBeforeScene == true) contextMenuList.push({action: "clearBeforeScene", label: jsLng.clearBefore});
 
-            if(removeAfterScene == true) contextMenuList.push({ action: "clearAfterScene", label: jsLng.clearAfter });
+            if (removeAfterScene == true) contextMenuList.push({action: "clearAfterScene", label: jsLng.clearAfter});
 
-            if(removeBeforeScene == false && removeAfterScene == false && data.$.typeBy.import == false) contextMenuList.push({ action: "clearCurrentScene", label: jsLng.clearCurrent });
+            if (removeBeforeScene == false && removeAfterScene == false && data.$.typeBy.import == false) contextMenuList.push({
+                action: "clearCurrentScene",
+                label: jsLng.clearCurrent
+            });
         }
     }
 
-    for(var key in this.nodeMgrs)
+    for (var key in this.nodeMgrs)
     {
         var mgr = this.nodeMgrs[key];
         var menuList = mgr.getContextMenuList != undefined ? mgr.getContextMenuList(data) : [];
 
-        if(menuList.length > 0 && contextMenuList.length >0) contextMenuList.push({type:"divider"});
+        if (menuList.length > 0 && contextMenuList.length > 0) contextMenuList.push({type: "divider"});
 
-        for(var i=0; i<menuList.length; i++)
+        for (var i = 0; i < menuList.length; i++)
         {
             var menuItem = menuList[i];
             menuItem.type = key;
@@ -440,45 +479,45 @@ ztmindmap.Wraper.prototype.getContextMenuList = function(data)
     return contextMenuList;
 }
 
-ztmindmap.Wraper.prototype.setAsScene = function($node, data)
+ztmindmap.Wraper.prototype.setAsScene = function ($node, data)
 {
 
-    this.changeNodeType($node,data, "scene");
-    this.autoReasoningAfter($node,data);
+    this.changeNodeType($node, data, "scene");
+    this.autoReasoningAfter($node, data);
 
     //如果父节点也是场景
     let parent = this.findParentNode(data);
-    if(parent.$.type == "scene" && parent.$.moduleID != undefined)
+    if (parent.$.type == "scene" && parent.$.moduleID != undefined)
     {
         let $parent = $("#node-" + parent.id);
-        this.copyScenePropertyAfter($parent,parent);
+        this.copyScenePropertyAfter($parent, parent);
     }
 
     this.refreshDisplay();
 }
 
-ztmindmap.Wraper.prototype.copyScenePropertyAfter = function($node, data)
+ztmindmap.Wraper.prototype.copyScenePropertyAfter = function ($node, data)
 {
     var children = data.children || [];
-    for(var childData of children)
+    for (var childData of children)
     {
-        if(childData.$.type != "scene") continue;
-        if(childData.$.typeBy.import == true) continue;
+        if (childData.$.type != "scene") continue;
+        if (childData.$.typeBy.import == true) continue;
 
         childData.$.moduleID = data.$.moduleID;
         var $childNode = $("#node-" + childData.id);
-        this.refreshNodeDisplay($childNode,childData);
+        this.refreshNodeDisplay($childNode, childData);
 
-        this.copyScenePropertyAfter($childNode,childData);
+        this.copyScenePropertyAfter($childNode, childData);
     }
 }
 
-ztmindmap.Wraper.prototype.clearTypeAfter = function($node, data)
+ztmindmap.Wraper.prototype.clearTypeAfter = function ($node, data)
 {
     var that = this;
 
     var children = data.children || [];
-    for(var child of children)
+    for (var child of children)
     {
         var $child = $("#node-" + child.id);
         clearTypeImpl($child, child);
@@ -486,9 +525,9 @@ ztmindmap.Wraper.prototype.clearTypeAfter = function($node, data)
 
     function clearTypeImpl($curNode, curData)
     {
-        that.changeNodeType($curNode,curData,undefined);
+        that.changeNodeType($curNode, curData, undefined);
         var curChildren = curData.children || [];
-        for(var curChild of curChildren)
+        for (var curChild of curChildren)
         {
             var $curChild = $("#node-" + curChild.id);
             clearTypeImpl($curChild, curChild);
@@ -498,45 +537,45 @@ ztmindmap.Wraper.prototype.clearTypeAfter = function($node, data)
     this.refreshDisplay();
 }
 
-ztmindmap.Wraper.prototype.clearBeforeScene = function($node, data)
+ztmindmap.Wraper.prototype.clearBeforeScene = function ($node, data)
 {
     var beforeScenes = this.findParentNodes(data);
-    for(var sceneData of beforeScenes)
+    for (var sceneData of beforeScenes)
     {
-        if(sceneData.$.type != "scene" || sceneData.$.typeBy.import == true) continue;
+        if (sceneData.$.type != "scene" || sceneData.$.typeBy.import == true) continue;
 
         var $sceneNode = $("#node-" + sceneData.id);
-        this.changeNodeType($sceneNode,sceneData,undefined);
+        this.changeNodeType($sceneNode, sceneData, undefined);
     }
 
     this.refreshDisplay();
 }
 
-ztmindmap.Wraper.prototype.clearAfterScene = function($node,data)
+ztmindmap.Wraper.prototype.clearAfterScene = function ($node, data)
 {
-    this.autoRemoveSceneAfer($node,data);
+    this.autoRemoveSceneAfer($node, data);
 
     var children = data.children || [];
-    for(var child of children)
+    for (var child of children)
     {
         var $child = $("#node-" + child.id);
-        this.changeNodeType($child,child,"testcase");
+        this.changeNodeType($child, child, "testcase");
     }
 
     this.refreshDisplay();
 }
 
-ztmindmap.Wraper.prototype.clearCurrentScene = function($node, data)
+ztmindmap.Wraper.prototype.clearCurrentScene = function ($node, data)
 {
-    if(data.$.typeBy.import == true) return;
+    if (data.$.typeBy.import == true) return;
 
-    this.changeNodeType($node,data,undefined);
-    this.autoRemoveSceneAfer($node,data);
+    this.changeNodeType($node, data, undefined);
+    this.autoRemoveSceneAfer($node, data);
 
     var parentData = this.findParentData(data);
-    if(parentData.$.type == "scene")
+    if (parentData.$.type == "scene")
     {
-        this.changeNodeType($node,data,"testcase");
+        this.changeNodeType($node, data, "testcase");
     }
 
     this.refreshDisplay();
@@ -547,36 +586,36 @@ ztmindmap.Wraper.prototype.clearCurrentScene = function($node, data)
  * @param {*} $node 给定的场景节点$dom 元素
  * @param {*} data  给定的场景节点数据
  */
-ztmindmap.Wraper.prototype.autoReasoningAfter = function($node,data)
+ztmindmap.Wraper.prototype.autoReasoningAfter = function ($node, data)
 {
     var children = data.children || [];
-    for(var i=0; i<children.length; i++)
+    for (var i = 0; i < children.length; i++)
     {
         var childData = children[i];
         var $childNode = $("#node-" + childData.id);
 
-        if(childData.$.typeBy.import == true) continue;
+        if (childData.$.typeBy.import == true) continue;
 
-        if(childData.$.type == "scene") continue;
+        if (childData.$.type == "scene") continue;
 
         //获取给定子节点的子元素长度(包括节点本身)
         var length = ztmindmap.getLengthOfNode(childData);
         //测试用例 -> 测试步骤 -> 预期
         //测试用例 -> 测试步骤分组 -> 测试步骤 -> 预期
-        if(length > 4)
+        if (length > 4)
         {
             //本身 + 子元素长度 大于 4 的肯定不是测试用例，这里自动推断为场景
             childData.$.moduleID = data.$.moduleID;
             childData.tooltip = data.tooltip;
-            this.changeNodeType($childNode,childData,"scene");
+            this.changeNodeType($childNode, childData, "scene");
 
-            this.autoReasoningAfter($childNode,childData);
+            this.autoReasoningAfter($childNode, childData);
         }
         else
         {
             //本身 + 子元素长度 小于等于 4 的可能是场景，也可能是测试用例，这里默认推断为测试用例
             //这里需要用户通过界面手动指定
-            this.changeNodeType($childNode,childData,"testcase");
+            this.changeNodeType($childNode, childData, "testcase");
         }
     }
 }
@@ -586,20 +625,20 @@ ztmindmap.Wraper.prototype.autoReasoningAfter = function($node,data)
  * @param {Object} $node 给定节点$Dom
  * @param {Object} data  给定节点数据
  */
-ztmindmap.Wraper.prototype.autoRemoveSceneAfer = function($node,data)
+ztmindmap.Wraper.prototype.autoRemoveSceneAfer = function ($node, data)
 {
     var children = data.children || [];
-    for(var i=0; i<children.length; i++)
+    for (var i = 0; i < children.length; i++)
     {
-        var childData  = children[i];
+        var childData = children[i];
         var $childNode = $("#node-" + childData.id);
 
-        if(childData.$.typeBy.import == true) continue;
+        if (childData.$.typeBy.import == true) continue;
 
         //所有后续节点都先设置成 undefined
-        this.changeNodeType($childNode,childData,undefined);
+        this.changeNodeType($childNode, childData, undefined);
 
-        this.autoRemoveSceneAfer($childNode,childData);
+        this.autoRemoveSceneAfer($childNode, childData);
     }
 }
 
@@ -608,20 +647,20 @@ ztmindmap.Wraper.prototype.autoRemoveSceneAfer = function($node,data)
  * @param {Object} $node 指定节点
  * @param {Object} data 指定节点的数据
  */
-ztmindmap.Wraper.prototype.autoSetSceneModuleAfter = function($node, data)
+ztmindmap.Wraper.prototype.autoSetSceneModuleAfter = function ($node, data)
 {
     var children = data.children || [];
-    for(var child of children)
+    for (var child of children)
     {
-        if(child.$.type == "scene")
+        if (child.$.type == "scene")
         {
             child.$.moduleID = data.$.moduleID;
             child.tooltip = data.tooltip;
 
             $child = $("#node-" + child.id);
-            this.refreshNodeDisplay($child,child);
+            this.refreshNodeDisplay($child, child);
 
-            this.autoSetSceneModuleAfter($child,child)
+            this.autoSetSceneModuleAfter($child, child)
         }
     }
 
@@ -633,29 +672,29 @@ ztmindmap.Wraper.prototype.autoSetSceneModuleAfter = function($node, data)
  * 必须满足：
  * @param {Object} data
  */
-ztmindmap.Wraper.prototype.canRemoveSceneBefore = function(data)
+ztmindmap.Wraper.prototype.canRemoveSceneBefore = function (data)
 {
     var scenes = this.findParentNodes(data);
-    for(var scene of scenes)
+    for (var scene of scenes)
     {
-        if(scene.$.type == "scene") return scene.$.typeBy.import == false;
+        if (scene.$.type == "scene") return scene.$.typeBy.import == false;
     }
 
     return false;
 }
 
-ztmindmap.Wraper.prototype.canRemoveSceneAfter = function(data)
+ztmindmap.Wraper.prototype.canRemoveSceneAfter = function (data)
 {
     var children = data.children || [];
-    for(var child of children)
+    for (var child of children)
     {
-        if(child.$.type == "scene")
+        if (child.$.type == "scene")
         {
             return child.$.typeBy.import == false;
         }
         else
         {
-            if(this.canRemoveSceneAfter(child) == true) return true;
+            if (this.canRemoveSceneAfter(child) == true) return true;
         }
     }
 
@@ -665,18 +704,18 @@ ztmindmap.Wraper.prototype.canRemoveSceneAfter = function(data)
 /**
  * 获取所有的叶子节点数据
  */
-ztmindmap.Wraper.prototype.getLeafDatas = function()
+ztmindmap.Wraper.prototype.getLeafDatas = function ()
 {
     var leafs = [];
 
     function findLeafs(data)
     {
-        if(data.children == undefined || data.children.length == 0)
+        if (data.children == undefined || data.children.length == 0)
             leafs.push(data);
         else
         {
             var children = data.children || [];
-            for(var child of children)
+            for (var child of children)
             {
                 findLeafs(child);
             }
@@ -688,29 +727,29 @@ ztmindmap.Wraper.prototype.getLeafDatas = function()
     return leafs;
 }
 
-ztmindmap.Wraper.prototype.findParentData = function(purData)
+ztmindmap.Wraper.prototype.findParentData = function (purData)
 {
     var parentList = this.findParentDatas(purData);
 
-    return parentList.length >=2 ? parentList[parentList.length-2] : undefined;
+    return parentList.length >= 2 ? parentList[parentList.length - 2] : undefined;
 }
 
 /**
  * 查找给数据的父节点，父父数据的集合(包括当前叶子节点)
  * @param {Object} purData
  */
-ztmindmap.Wraper.prototype.findParentDatas = function(purData)
+ztmindmap.Wraper.prototype.findParentDatas = function (purData)
 {
     var results = [];
 
     function findParentDataPath(data)
     {
-        if(data == purData) return true;
+        if (data == purData) return true;
 
         var children = data.children || [];
-        for(var child of children)
+        for (var child of children)
         {
-            if(findParentDataPath(child) == true)
+            if (findParentDataPath(child) == true)
             {
                 results.unshift(child);
                 return true;
@@ -722,7 +761,7 @@ ztmindmap.Wraper.prototype.findParentDatas = function(purData)
 
     var flag = findParentDataPath(this.data);
 
-    if(flag == true) results.unshift(this.data);
+    if (flag == true) results.unshift(this.data);
 
     return results;
 }
@@ -732,23 +771,23 @@ ztmindmap.Wraper.prototype.findParentDatas = function(purData)
  * 倒序，使用的时候注意坑
  * @param {Object} data
  */
-ztmindmap.Wraper.prototype.findParentNodes = function(data)
+ztmindmap.Wraper.prototype.findParentNodes = function (data)
 {
 
     var results = [];
 
     function findParentPath(iData)
     {
-        if(iData.id == data.parent)
+        if (iData.id == data.parent)
         {
             results.push(iData);
             return true;
         }
 
         var children = iData.children || [];
-        for(var child of children)
+        for (var child of children)
         {
-            if(findParentPath(child) == true)
+            if (findParentPath(child) == true)
             {
                 results.push(child);
                 return true;
@@ -767,17 +806,17 @@ ztmindmap.Wraper.prototype.findParentNodes = function(data)
  * 查找给定数据的父节点
  * @param {Object} data 给定数据
  */
-ztmindmap.Wraper.prototype.findParentNode = function(data)
+ztmindmap.Wraper.prototype.findParentNode = function (data)
 {
     function findParentImpl(iData)
     {
-        if(iData.id == data.parent) return iData;
+        if (iData.id == data.parent) return iData;
 
         var children = iData.children || [];
-        for(var child of children)
+        for (var child of children)
         {
             var result = findParentImpl(child);
-            if(result != undefined) return result;
+            if (result != undefined) return result;
         }
 
         return undefined;
@@ -786,62 +825,62 @@ ztmindmap.Wraper.prototype.findParentNode = function(data)
     return findParentImpl(this.instance.data);
 }
 
-ztmindmap.Wraper.prototype.refreshNodeDisplay = function($node,data)
+ztmindmap.Wraper.prototype.refreshNodeDisplay = function ($node, data)
 {
     var mgr = this.nodeMgrs[data.$.type];
-    mgr && mgr.refreshNodeDisplay && mgr.refreshNodeDisplay($node,data);
+    mgr && mgr.refreshNodeDisplay && mgr.refreshNodeDisplay($node, data);
 }
 
-ztmindmap.Wraper.prototype.register = function($node, data)
+ztmindmap.Wraper.prototype.register = function ($node, data)
 {
     var mgr = this.nodeMgrs[data.$.type];
-    mgr && mgr.register && mgr.register($node,data);
+    mgr && mgr.register && mgr.register($node, data);
 }
 
-ztmindmap.Wraper.prototype.changeNodeType = function($node,data,newType)
+ztmindmap.Wraper.prototype.changeNodeType = function ($node, data, newType)
 {
-    if(data.$.type == newType) return;
+    if (data.$.type == newType) return;
 
     var oldMgr = this.nodeMgrs[data.$.type];
     var newMgr = this.nodeMgrs[newType];
 
     data.$.type = newType;
 
-    if(oldMgr != undefined)
+    if (oldMgr != undefined)
     {
-        oldMgr["clearNodeDisplay"] && oldMgr["clearNodeDisplay"]($node,data);
-        oldMgr["unRegister"] && oldMgr["unRegister"]($node,data);
+        oldMgr["clearNodeDisplay"] && oldMgr["clearNodeDisplay"]($node, data);
+        oldMgr["unRegister"] && oldMgr["unRegister"]($node, data);
     }
 
-    if(newMgr != undefined)
+    if (newMgr != undefined)
     {
-        newMgr["refreshNodeDisplay"] && newMgr["refreshNodeDisplay"]($node,data);
-        newMgr["register"] && newMgr["register"]($node,data);
+        newMgr["refreshNodeDisplay"] && newMgr["refreshNodeDisplay"]($node, data);
+        newMgr["register"] && newMgr["register"]($node, data);
     }
 };
 
-ztmindmap.Wraper.prototype.xmindXml2zendao = function(topic, parent,level)
+ztmindmap.Wraper.prototype.xmindXml2zendao = function (topic, parent, level)
 {
-    var obj = this.paserXmindNode(topic,level);
+    var obj = this.paserXmindNode(topic, level);
     parent.children.push(obj);
 
     var joinChildren = [];
 
-    if(topic.children != undefined)
+    if (topic.children != undefined)
     {
         var children = topic.children;
-        if(ztmindmap.isObject(children)) children = [children];
+        if (ztmindmap.isObject(children)) children = [children];
 
-        for(child of children)
+        for (child of children)
         {
             var topicsList = child.topics;
-            if(ztmindmap.isObject(topicsList)) topicsList = [topicsList];
+            if (ztmindmap.isObject(topicsList)) topicsList = [topicsList];
 
-            for(var topics of topicsList)
+            for (var topics of topicsList)
             {
                 var topic = topics.topic;
-                if(ztmindmap.isObject(topic)) topic = [topic];
-                for(var t of topic)
+                if (ztmindmap.isObject(topic)) topic = [topic];
+                for (var t of topic)
                 {
                     joinChildren.push(t);
                 }
@@ -849,26 +888,26 @@ ztmindmap.Wraper.prototype.xmindXml2zendao = function(topic, parent,level)
         }
     }
 
-    for(var i=0; i<joinChildren.length; i++)
-        this.xmindXml2zendao(joinChildren[i],obj,level+1);
+    for (var i = 0; i < joinChildren.length; i++)
+        this.xmindXml2zendao(joinChildren[i], obj, level + 1);
 };
 
-ztmindmap.Wraper.prototype.xmindJson2zendao = function(parentJson, parentNode,level)
+ztmindmap.Wraper.prototype.xmindJson2zendao = function (parentJson, parentNode, level)
 {
-    if(parentJson.children == undefined) return;
-    if(parentJson.children.attached == undefined) return;
+    if (parentJson.children == undefined) return;
+    if (parentJson.children.attached == undefined) return;
 
     var children = parentJson.children;
 
     var attached = children.attached;
-    if(ztmindmap.isArray(attached) == false)
+    if (ztmindmap.isArray(attached) == false)
         attached = [attached];
 
-    for(var att of attached)
+    for (var att of attached)
     {
-        var obj = this.paserXmindNode(att,level);
+        var obj = this.paserXmindNode(att, level);
         parentNode.children.push(obj);
-        this.xmindJson2zendao(att,obj,level+1);
+        this.xmindJson2zendao(att, obj, level + 1);
     }
 };
 
@@ -878,12 +917,12 @@ ztmindmap.Wraper.prototype.xmindJson2zendao = function(parentJson, parentNode,le
  * 2）场景后面的所有子场景继承场景的模块
  * 3）场景之前的所有节点，前置设置为场景，并不容许删除(import=true, create=auto)
  */
-ztmindmap.Wraper.prototype.inheritImportProps = function()
+ztmindmap.Wraper.prototype.inheritImportProps = function ()
 {
-    if(this.data.$.typeBy.import == false || this.data.$.productID == undefined) return;
+    if (this.data.$.typeBy.import == false || this.data.$.productID == undefined) return;
 
     var leafs = this.getLeafDatas();
-    for(var leaf of leafs)
+    for (var leaf of leafs)
     {
         var strandList = this.findParentDatas(leaf);
         //两个场景之间的其他节点统一设置为场景节点
@@ -901,18 +940,18 @@ ztmindmap.Wraper.prototype.inheritImportProps = function()
     function checkLastSceneAfter(dataList)
     {
         var lastIndex = -1;
-        for(var i=dataList.length-1;i>=0;i--)
+        for (var i = dataList.length - 1; i >= 0; i--)
         {
-            if(dataList[i].$.type == "scene")
+            if (dataList[i].$.type == "scene")
             {
                 lastIndex = i;
                 break;
             }
         }
 
-        if(lastIndex < 0 || lastIndex == dataList.length-1) return;
+        if (lastIndex < 0 || lastIndex == dataList.length - 1) return;
 
-        var nextData = dataList[lastIndex+1];
+        var nextData = dataList[lastIndex + 1];
         nextData.$.type = "testcase";
     }
 
@@ -921,28 +960,28 @@ ztmindmap.Wraper.prototype.inheritImportProps = function()
         var firstSceneIndex = -1;
         var lastSceneIndex = -1;
 
-        for(var i=0;i<dataList.length;i++)
+        for (var i = 0; i < dataList.length; i++)
         {
-            if(dataList[i].$.type == "scene")
+            if (dataList[i].$.type == "scene")
             {
                 firstSceneIndex = i;
                 break;
             }
         }
 
-        for(var i=dataList.length-1;i>=0;i--)
+        for (var i = dataList.length - 1; i >= 0; i--)
         {
-            if(dataList[i].$.type == "scene")
+            if (dataList[i].$.type == "scene")
             {
                 lastSceneIndex = i;
                 break;
             }
         }
 
-        if(firstSceneIndex == lastSceneIndex)
+        if (firstSceneIndex == lastSceneIndex)
             return;
 
-        for(var i=firstSceneIndex;i<=lastSceneIndex;i++)
+        for (var i = firstSceneIndex; i <= lastSceneIndex; i++)
         {
             dataList[i].$.type = "scene";
         }
@@ -951,21 +990,21 @@ ztmindmap.Wraper.prototype.inheritImportProps = function()
     function checkSceneAfterModuleNode(dataList)
     {
         var referIndex = -1;
-        for(var i=0;i<dataList.length;i++)
+        for (var i = 0; i < dataList.length; i++)
         {
-            if(dataList[i].$.type == "module" || dataList[i].$.type == "scene")
+            if (dataList[i].$.type == "module" || dataList[i].$.type == "scene")
             {
                 referIndex = i;
                 break;
             }
         }
 
-        if(referIndex < 0) return;
+        if (referIndex < 0) return;
 
         var moduleID = dataList[referIndex].$.moduleID;
-        for(var i=referIndex + 1; i<dataList.length;i++)
+        for (var i = referIndex + 1; i < dataList.length; i++)
         {
-            if(dataList[i].$.type == "scene") dataList[i].$.moduleID = moduleID;
+            if (dataList[i].$.type == "scene") dataList[i].$.moduleID = moduleID;
         }
     }
 
@@ -974,27 +1013,27 @@ ztmindmap.Wraper.prototype.inheritImportProps = function()
         var firstSceneIndex = -1;
         var lastSceneIndex = -1;
 
-        for(var i=0;i<dataList.length;i++)
+        for (var i = 0; i < dataList.length; i++)
         {
-            if(dataList[i].$.type == "scene" && dataList[i].$.typeBy.import == true)
+            if (dataList[i].$.type == "scene" && dataList[i].$.typeBy.import == true)
             {
                 firstSceneIndex = i;
                 break;
             }
         }
 
-        for(var i=dataList.length-1;i>=0;i--)
+        for (var i = dataList.length - 1; i >= 0; i--)
         {
-            if(dataList[i].$.type == "scene" && dataList[i].$.typeBy.import == true)
+            if (dataList[i].$.type == "scene" && dataList[i].$.typeBy.import == true)
             {
                 lastSceneIndex = i;
                 break;
             }
         }
 
-        if(firstSceneIndex == lastSceneIndex) return;
+        if (firstSceneIndex == lastSceneIndex) return;
 
-        for(var i=firstSceneIndex;i<=lastSceneIndex;i++)
+        for (var i = firstSceneIndex; i <= lastSceneIndex; i++)
         {
             dataList[i].$.typeBy.import = true;
             dataList[i].$.typeBy.create = "auto";
@@ -1002,30 +1041,34 @@ ztmindmap.Wraper.prototype.inheritImportProps = function()
     }
 }
 
-ztmindmap.Wraper.prototype.paserXmindNode = function(nodeData, level)
+// 修改解析XMind节点的方法，添加前置条件解析
+ztmindmap.Wraper.prototype.paserXmindNode = function (nodeData, level)
 {
     var titleInfo = ztmindmap.splitText(getNodeText(nodeData.title));
-
-    var obj = { id:nodeData.id,
-                text: titleInfo.text,
-                type: level == 0 ? "root": (level == 1 ? "sub" : "node"),
-                children:[],
-                subSide:"right",
-                $:{
-                    type: undefined,
-                    typeBy: { import:false, create: "auto" }
-                }};
+    var obj = {
+        id: nodeData.id,
+        text: titleInfo.text,
+        type: level == 0 ? "root" : (level == 1 ? "sub" : "node"),
+        children: [],
+        subSide: "right",
+        $: {
+            type: undefined,
+            typeBy: {import: false, create: "auto"}
+        }
+    };
 
     var props = ztmindmap.kv2Obj(titleInfo.suffix);
-    if(obj.type == "root" && titleInfo.suffix != undefined)
+    if (obj.type == "root" && titleInfo.suffix != undefined)
         this['setPropsInProduct'] && this['setPropsInProduct'](obj, titleInfo.suffix);
-    else if(props[this.typeKeys.module] != undefined)
+    else if (props[this.typeKeys.module] != undefined)
         this['setPropsInModule'] && this['setPropsInModule'](obj, props);
-    else if(props[this.typeKeys.scene] != undefined)
+    else if (props[this.typeKeys.scene] != undefined)
         this['setPropsInScene'] && this['setPropsInScene'](obj, props);
-    else if(props[this.typeKeys.testcase] != undefined)
+    else if (props[this.typeKeys.testcase] != undefined)
         this['setPropsInTestcase'] && this['setPropsInTestcase'](obj, props);
-    else if(props[this.typeKeys.stepGroup] != undefined)
+    else if (props[this.typeKeys.precondition] != undefined)
+        this['setPropsInPrecondition'] && this['setPropsInPrecondition'](obj, props);
+    else if (props[this.typeKeys.stepGroup] != undefined)
     {
         obj.$.type = "stepGroup";
         obj.$.typeBy.import = true;
@@ -1039,9 +1082,9 @@ ztmindmap.Wraper.prototype.paserXmindNode = function(nodeData, level)
     }
 };
 
-ztmindmap.Wraper.prototype.setPropsInProduct = function(obj, suffix)
+ztmindmap.Wraper.prototype.setPropsInProduct = function (obj, suffix)
 {
-    if(ztmindmap.isID(suffix) == false) return;
+    if (ztmindmap.isID(suffix) == false) return;
 
     obj.readonly = true;
     obj.$.productID = suffix * 1;
@@ -1050,14 +1093,14 @@ ztmindmap.Wraper.prototype.setPropsInProduct = function(obj, suffix)
     obj.$.typeBy.create = "auto";
 }
 
-ztmindmap.Wraper.prototype.setPropsInModule = function(obj, props)
+ztmindmap.Wraper.prototype.setPropsInModule = function (obj, props)
 {
     var moduleID = props[this.typeKeys.module];
 
     obj.$.type = "module";
     obj.$.typeBy.create = "auto";
 
-    if(ztmindmap.isID(moduleID) == true)
+    if (ztmindmap.isID(moduleID) == true)
     {
         obj.readonly = true;
         obj.$.moduleID = moduleID;
@@ -1065,21 +1108,21 @@ ztmindmap.Wraper.prototype.setPropsInModule = function(obj, props)
     }
 }
 
-ztmindmap.Wraper.prototype.setPropsInScene = function(obj, props)
+ztmindmap.Wraper.prototype.setPropsInScene = function (obj, props)
 {
     var sceneID = props[this.typeKeys.scene];
 
     obj.$.type = "scene";
     obj.$.typeBy.create = "auto";
 
-    if(ztmindmap.isID(sceneID))
+    if (ztmindmap.isID(sceneID))
     {
         obj.$.sceneID = sceneID;
         obj.$.typeBy.import = true;
     }
 }
 
-ztmindmap.Wraper.prototype.setPropsInTestcase = function(obj, props)
+ztmindmap.Wraper.prototype.setPropsInTestcase = function (obj, props)
 {
 
     var testcaseID = props[this.typeKeys.testcase];
@@ -1088,14 +1131,14 @@ ztmindmap.Wraper.prototype.setPropsInTestcase = function(obj, props)
     obj.$.pri = props[this.typeKeys['pri']] || 3;
     obj.$.typeBy.create = "auto";
 
-    if(ztmindmap.isID(testcaseID))
+    if (ztmindmap.isID(testcaseID))
     {
         obj.$.testcaseID = testcaseID;
         obj.$.typeBy.import = true;
     }
 }
 
-ztmindmap.Wraper.prototype.toJson = function()
+ztmindmap.Wraper.prototype.toJson = function ()
 {
     var that = this;
 
@@ -1106,20 +1149,21 @@ ztmindmap.Wraper.prototype.toJson = function()
 
     function sceneToJson(data)
     {
-        if(data.$.type == "scene") sceneList.push(that.singleSceneToJson(data));
-        if(data.$.type == "testcase") return;
+        if (data.$.type == "scene") sceneList.push(that.singleSceneToJson(data));
+        if (data.$.type == "testcase") return;
 
         var children = data.children || [];
-        for(var child of children) sceneToJson(child);
+        for (var child of children) sceneToJson(child);
     }
 
     function testcaseToJson(data)
     {
-        if(data.$.type == "testcase")
+        if (data.$.type == "testcase")
             testcaseList.push(that.singleTestCaseToJson(data));
-        else {
+        else
+        {
             var children = data.children || [];
-            for(var child of children)
+            for (var child of children)
                 testcaseToJson(child);
         }
     }
@@ -1127,56 +1171,70 @@ ztmindmap.Wraper.prototype.toJson = function()
     sceneToJson(rootData);
     testcaseToJson(rootData);
 
-    return {sceneList:sceneList, testcaseList:testcaseList};
+    return {sceneList: sceneList, testcaseList: testcaseList};
 };
 
-ztmindmap.Wraper.prototype.singleSceneToJson = function(data)
+ztmindmap.Wraper.prototype.singleSceneToJson = function (data)
 {
     var obj = {
         name: data.text,
-        module: ztmindmap.toNum(data.$.moduleID,undefined),
+        module: ztmindmap.toNum(data.$.moduleID, undefined),
         product: this.productID * 1,
         branch: this.branch * 1,
         tmpId: data.id,
         tmpPId: data.parent,
     }
 
-    if(data.$.sceneID != undefined && data.$.sceneID != "") obj.id = data.$.sceneID * 1;
+    if (data.$.sceneID != undefined && data.$.sceneID != "") obj.id = data.$.sceneID * 1;
 
     return obj;
 };
 
-ztmindmap.Wraper.prototype.singleTestCaseToJson = function(data)
+// 修改单个测试用例转JSON的方法，添加前置条件处理
+ztmindmap.Wraper.prototype.singleTestCaseToJson = function (data)
 {
     var parentNode = this.findParentNode(data);
 
     //获取测试用例数据
     var obj = {
-        pri: ztmindmap.toNum(data.$.pri,3),
+        pri: ztmindmap.toNum(data.$.pri, 3),
         name: data.text,
-        //module: ztmindmap.toNum(scene.$.moduleID,0),
         product: this.productID * 1,
         branch: this.branch * 1,
         tmpId: data.id,
         tmpPId: data.parent,
+        precondition: ""  // 添加前置条件字段
     }
 
-    if(parentNode.$.type == "scene")
-        obj.module = ztmindmap.toNum(parentNode.$.moduleID,0);
-    else if(parentNode.$.type == "module")
-        obj.module = ztmindmap.toNum(parentNode.$.moduleID,0);
+    if (parentNode.$.type == "scene")
+        obj.module = ztmindmap.toNum(parentNode.$.moduleID, 0);
+    else if (parentNode.$.type == "module")
+        obj.module = ztmindmap.toNum(parentNode.$.moduleID, 0);
     else
         obj.module = 0;
 
+    // 查找前置条件节点
+    var children = data.children || [];
+    for (var child of children)
+    {
+        if (child.$.type == "precondition")
+        {
+            obj.precondition = child.text;
+            break;
+        }
+    }
+
     //设置测试用例的id
-    if(data.$.testcaseID != undefined && data.$.testcaseID != "")
+    if (data.$.testcaseID != undefined && data.$.testcaseID != "")
         obj.id = data.$.testcaseID * 1;
 
     //获取测试用例的步骤
     obj.stepList = [];
-    var children = data.children || [];
-    for(var child of children)
+    for (var child of children)
     {
+        // 跳过前置条件节点，只处理步骤
+        if (child.$.type == "precondition") continue;
+
         var step = {
             type: "step",
             desc: child.text,
@@ -1191,7 +1249,7 @@ ztmindmap.Wraper.prototype.singleTestCaseToJson = function(data)
 
         //child的子元素：
         //1) 有且仅只有一个，这个子元素作为期望结果来处理
-        if(maxLng == 2 && child.$.type != "stepGroup")
+        if (maxLng == 2 && child.$.type != "stepGroup")
         {
             step.expect = nextChilds[0].text;
             step.type = "step";
@@ -1199,10 +1257,10 @@ ztmindmap.Wraper.prototype.singleTestCaseToJson = function(data)
         }
 
         //2) 有多个子元素， 当前元素是步骤分组， 这些子元素作为子步骤
-        if(maxLng > 2 || child.$.type == "stepGroup")
+        if (maxLng > 2 || child.$.type == "stepGroup")
         {
             step.type = "group";
-            for(var nextChild of nextChilds)
+            for (var nextChild of nextChilds)
             {
                 var subStep = {
                     type: "item",
@@ -1213,7 +1271,7 @@ ztmindmap.Wraper.prototype.singleTestCaseToJson = function(data)
 
                 //如果后续只有一个子元素，作为期望的结果来处理，超过一个子元素，丢掉后面的子元素
                 var nextNextChild = nextChild.children || [];
-                if(nextNextChild.length == 1)
+                if (nextNextChild.length == 1)
                     subStep.expect = nextNextChild[0].text;
 
                 obj.stepList.push(subStep);
@@ -1224,66 +1282,71 @@ ztmindmap.Wraper.prototype.singleTestCaseToJson = function(data)
     return obj;
 };
 
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
-if(window.ztmindmap == undefined) window.ztmindmap = {};
-
-ztmindmap.TestcaseManager = function(wraper)
+ztmindmap.TestcaseManager = function (wraper)
 {
     this.wraper = wraper;
     this.priSelector = undefined;
 }
 
-ztmindmap.TestcaseManager.prototype.init = function()
+ztmindmap.TestcaseManager.prototype.init = function ()
 {
     this.priSelector = new ztmindmap.PriSelector(this);
 }
 
-ztmindmap.TestcaseManager.prototype.register = function($node, data)
+ztmindmap.TestcaseManager.prototype.register = function ($node, data)
 {
     let that = this;
 
-    $node.find(".pri-level").click(function(e)
+    $node.find(".pri-level").click(function (e)
     {
-        that.priSelector.show($node,data);
+        that.priSelector.show($node, data);
     });
 };
 
-ztmindmap.TestcaseManager.prototype.unRegister = function($node, data)
+ztmindmap.TestcaseManager.prototype.unRegister = function ($node, data)
 {
     $node.find(".pri-level").unbind();
 };
 
-ztmindmap.TestcaseManager.prototype.getContextMenuList = function(data)
+// 修改 TestcaseManager 添加前置条件相关功能
+ztmindmap.TestcaseManager.prototype.getContextMenuList = function (data)
 {
     var parent = this.wraper.findParentNode(data);
-    if(parent == undefined || parent.$.type != "testcase")
+    if (parent == undefined || parent.$.type != "testcase")
         return [];
 
-    if(data.$.type == "stepGroup")
-        return [{action:"removeStepGroup", label:jsLng.removeGroup}];
+    if (data.$.type == "stepGroup")
+        return [{action: "removeStepGroup", label: jsLng.removeGroup}];
+    else if (data.$.type == "precondition")
+        return [{action: "removePrecondition", label: jsLng.removePrecondition}];
     else
-        return [{action:"addStepGroup", label:jsLng.set2Group}];
+        return [
+            {action: "addStepGroup", label: jsLng.set2Group},
+            {action: "addPrecondition", label: jsLng.set2Precondition}
+        ];
 };
 
-ztmindmap.TestcaseManager.prototype.removeStepGroup = function($node,data)
+ztmindmap.TestcaseManager.prototype.removeStepGroup = function ($node, data)
 {
-    this.wraper.changeNodeType($node,data,undefined);
+    this.wraper.changeNodeType($node, data, undefined);
     this.refreshDisplay();
 }
 
-ztmindmap.TestcaseManager.prototype.addStepGroup = function($node,data)
+ztmindmap.TestcaseManager.prototype.addStepGroup = function ($node, data)
 {
-    this.wraper.changeNodeType($node,data,"stepGroup");
+    this.wraper.changeNodeType($node, data, "stepGroup");
     this.refreshDisplay();
 }
 
-ztmindmap.TestcaseManager.prototype.clearNodeDisplay = function($node, data)
+ztmindmap.TestcaseManager.prototype.clearNodeDisplay = function ($node, data)
 {
     $node.find(".suffix").hide();
     $node.find(".pri-level").hide();
 };
 
-ztmindmap.TestcaseManager.prototype.refreshNodeDisplay = function($node, data)
+ztmindmap.TestcaseManager.prototype.refreshNodeDisplay = function ($node, data)
 {
     $node.find(".pri-level").show();
 
@@ -1292,7 +1355,7 @@ ztmindmap.TestcaseManager.prototype.refreshNodeDisplay = function($node, data)
     $node.find(".pri-level").removeClass("pri-3");
     $node.find(".pri-level").removeClass("pri-4");
 
-    if(data.$.pri == undefined)
+    if (data.$.pri == undefined)
     {
         $node.find(".pri-level").addClass("pri-empty");
         $node.find(".pri-level").html("");
@@ -1304,29 +1367,44 @@ ztmindmap.TestcaseManager.prototype.refreshNodeDisplay = function($node, data)
         $node.find(".pri-level").addClass("pri-" + data.$.pri);
     }
 
-    if(data.$.testcaseID != undefined)
+    // 显示前置条件标识
+    if (data.$.type == "precondition")
+    {
+        $node.find(".precondition-indicator").show();
+    }
+    else
+    {
+        $node.find(".precondition-indicator").hide();
+    }
+
+    if (data.$.testcaseID != undefined)
     {
         $node.find(".suffix").show();
         $node.find(".suffix").find(".content").html(this.wraper.disKeys['testcase'] + ":" + data.$.testcaseID);
     }
+    else if (data.$.preconditionID != undefined)
+    {
+        $node.find(".suffix").show();
+        $node.find(".suffix").find(".content").html(this.wraper.disKeys['precondition'] + ":" + data.$.preconditionID);
+    }
 };
 
-ztmindmap.TestcaseManager.prototype.refreshDisplay = function()
+ztmindmap.TestcaseManager.prototype.refreshDisplay = function ()
 {
     this.wraper.refreshDisplay();
 }
 
-ztmindmap.PriSelector = function(mgr)
+ztmindmap.PriSelector = function (mgr)
 {
     this.$gradeDom = undefined;
-    this.$node     = undefined;
-    this.data      = undefined;
-    this.mgr       = mgr;
+    this.$node = undefined;
+    this.data = undefined;
+    this.mgr = mgr;
 
     this.init();
 };
 
-ztmindmap.PriSelector.prototype.init = function()
+ztmindmap.PriSelector.prototype.init = function ()
 {
     var that = this;
 
@@ -1342,15 +1420,15 @@ ztmindmap.PriSelector.prototype.init = function()
 
     $(".mindmap-container").append($priDom);
 
-    $priDom.find("a").on("click",function(e)
+    $priDom.find("a").on("click", function (e)
     {
         var pri = $(e.currentTarget).attr("pri");
         that.data.$.pri = pri;
-        that.mgr.refreshNodeDisplay(that.$node,that.data);
+        that.mgr.refreshNodeDisplay(that.$node, that.data);
         that.mgr.refreshDisplay();
     });
 
-    $(document).click(function()
+    $(document).click(function ()
     {
         that.hide();
     })
@@ -1359,21 +1437,21 @@ ztmindmap.PriSelector.prototype.init = function()
     that.$priDom = $priDom;
 };
 
-ztmindmap.PriSelector.prototype.show = function($node, data)
+ztmindmap.PriSelector.prototype.show = function ($node, data)
 {
-    this.$node     = $node;
-    this.data      = data;
+    this.$node = $node;
+    this.data = data;
 
-    var nodeLeft   = $node.position().left - 15;
-    var nodeTop    = $node.position().top;
+    var nodeLeft = $node.position().left - 15;
+    var nodeTop = $node.position().top;
     var nodeHeight = $node.height();
 
-    this.$priDom.css({left:nodeLeft, top:nodeTop + nodeHeight + 10});
+    this.$priDom.css({left: nodeLeft, top: nodeTop + nodeHeight + 10});
 
     this.$priDom.show();
 };
 
-ztmindmap.PriSelector.prototype.hide = function($node, data)
+ztmindmap.PriSelector.prototype.hide = function ($node, data)
 {
     this.$node = undefined;
     this.data = undefined;
@@ -1381,25 +1459,24 @@ ztmindmap.PriSelector.prototype.hide = function($node, data)
     this.$priDom && this.$priDom.hide();
 };
 
+if (window.ztmindmap == undefined) window.ztmindmap = {};
 
-if(window.ztmindmap == undefined) window.ztmindmap = {};
-
-ztmindmap.isArray = function(obj)
+ztmindmap.isArray = function (obj)
 {
     return Object.prototype.toString.call(obj) === '[object Array]';
 }
 
-ztmindmap.isObject = function(obj)
+ztmindmap.isObject = function (obj)
 {
     return Object.prototype.toString.call(obj) === '[object Object]';
 };
 
-ztmindmap.getLengthOfNode = function(data)
+ztmindmap.getLengthOfNode = function (data)
 {
     var maxLength = 0;
 
     var children = data.children || [];
-    for(var i=0; i<children.length; i++)
+    for (var i = 0; i < children.length; i++)
     {
         var tmpLength = ztmindmap.getLengthOfNode(children[0]);
         maxLength = Math.max(maxLength, tmpLength);
@@ -1408,65 +1485,66 @@ ztmindmap.getLengthOfNode = function(data)
     return maxLength + 1;
 }
 
-ztmindmap.toNum = function(v, defaultValue = undefined)
+ztmindmap.toNum = function (v, defaultValue = undefined)
 {
-    if(v == undefined || v == "")
+    if (v == undefined || v == "")
         return defaultValue ? defaultValue * 1 : defaultValue;
 
     return v * 1;
 }
 
-ztmindmap.trim = function(str)
+ztmindmap.trim = function (str)
 {
-    if(str == undefined) return undefined;
+    if (str == undefined) return undefined;
 
     return str.replace(/(^\s*)|(\s*$)/g, "");
 }
 
-ztmindmap.splitText = function(str)
+ztmindmap.splitText = function (str)
 {
     str = ztmindmap.trim(str);
 
-    if(str == undefined || str == "") return {text:undefined, suffix:undefined};
+    if (str == undefined || str == "") return {text: undefined, suffix: undefined};
 
-    var last = str.substr(str.length-1,1);
+    var last = str.substr(str.length - 1, 1);
 
-    if(last != "]" && last != "】") return {text:str, suffix:undefined};
+    if (last != "]" && last != "】") return {text: str, suffix: undefined};
 
     var sIndex1 = str.lastIndexOf("[");
     var sIndex2 = str.lastIndexOf("【");
-    var sIndex = Math.max(sIndex1,sIndex2);
+    var sIndex = Math.max(sIndex1, sIndex2);
 
-    if(sIndex < 0) return {text:str, suffix:undefined};
+    if (sIndex < 0) return {text: str, suffix: undefined};
 
     var text = str.substring(0, sIndex);
-    var suffix = str.substring(sIndex+1, str.length-1);
+    var suffix = str.substring(sIndex + 1, str.length - 1);
 
-    return {text:ztmindmap.trim(text), suffix:ztmindmap.trim(suffix)};
+    return {text: ztmindmap.trim(text), suffix: ztmindmap.trim(suffix)};
 }
 
-ztmindmap.kv2Obj = function(suffix)
+// 修改工具函数，支持解析前置条件
+ztmindmap.kv2Obj = function (suffix)
 {
-    if(suffix == undefined) return {};
+    if (suffix == undefined) return {};
 
-    suffix = suffix.replace("，",",");
-    suffix = suffix.replace("：",":");
+    suffix = suffix.replace("，", ",");
+    suffix = suffix.replace("：", ":");
     suffix = suffix.toLowerCase();
 
     var obj = {};
 
     var kvList = suffix.split(",");
-    for(var kvStr of kvList)
+    for (var kvStr of kvList)
     {
         var tmpKvStr = ztmindmap.trim(kvStr);
-        if(tmpKvStr == undefined || tmpKvStr == "") continue;
+        if (tmpKvStr == undefined || tmpKvStr == "") continue;
 
         var kvSplit = tmpKvStr.split(":");
 
         var key = undefined;
         var value = undefined;
 
-        if(kvSplit.length == 1)
+        if (kvSplit.length == 1)
         {
             key = ztmindmap.trim(kvSplit[0]);
             value = key;
@@ -1483,10 +1561,100 @@ ztmindmap.kv2Obj = function(suffix)
     return obj;
 }
 
-ztmindmap.isID = function(str)
+ztmindmap.isID = function (str)
 {
-    if(str == undefined || str == "") return false;
+    if (str == undefined || str == "") return false;
 
     return /(^[1-9]\d*$)/.test(str);
 }
+
+// 添加前置条件管理器
+ztmindmap.PreconditionManager = function (wraper)
+{
+    this.wraper = wraper;
+};
+
+ztmindmap.PreconditionManager.prototype.clearNodeDisplay = function ($node, data)
+{
+    $node.find(".suffix").hide();
+    $node.find(".precondition-indicator").hide();
+};
+
+ztmindmap.PreconditionManager.prototype.refreshNodeDisplay = function ($node, data)
+{
+    $node.find(".precondition-indicator").show();
+
+    $node.find(".suffix").show();
+    $node.find(".suffix").find(".content").html(this.wraper.disKeys['precondition']);
+};
+
+ztmindmap.PreconditionManager.prototype.getContextMenuList = function (data)
+{
+    // 检查父节点是否为测试用例
+    var parentNode = this.wraper.findParentNode(data);
+    if (parentNode && parentNode.$.type == "testcase")
+    {
+        var menus = [];
+
+        // 如果当前节点不是前置条件，可以设为前置条件
+        if (data.$.type != "precondition")
+        {
+            menus.push({action: "setAsPrecondition", label: jsLng.set2Precondition});
+        }
+
+        // 如果当前节点是前置条件，可以清除类型
+        if (data.$.type == "precondition")
+        {
+            menus.push({action: "clearPrecondition", label: jsLng.clearPrecondition});
+        }
+
+        return menus;
+    }
+
+    return [];
+};
+
+ztmindmap.PreconditionManager.prototype.setAsPrecondition = function ($node, data)
+{
+    this.wraper.changeNodeType($node, data, "precondition");
+    this.wraper.refreshDisplay();
+};
+
+ztmindmap.PreconditionManager.prototype.clearPrecondition = function ($node, data)
+{
+    this.wraper.changeNodeType($node, data, undefined);
+    this.wraper.refreshDisplay();
+};
+
+ztmindmap.PreconditionManager.prototype.refreshDisplay = function ()
+{
+    this.wraper.refreshDisplay();
+};
+
+ztmindmap.TestcaseManager.prototype.addPrecondition = function ($node, data)
+{
+    this.wraper.changeNodeType($node, data, "precondition");
+    this.refreshDisplay();
+};
+
+ztmindmap.TestcaseManager.prototype.removePrecondition = function ($node, data)
+{
+    this.wraper.changeNodeType($node, data, undefined);
+    this.refreshDisplay();
+};
+
+ztmindmap.Wraper.prototype.setPropsInPrecondition = function (obj, props)
+{
+    var preconditionID = props[this.typeKeys.precondition];
+
+    obj.$.type = "precondition";
+    obj.$.typeBy.create = "auto";
+
+    if (ztmindmap.isID(preconditionID))
+    {
+        obj.$.preconditionID = preconditionID;
+        obj.$.typeBy.import = true;
+    }
+};
+
 

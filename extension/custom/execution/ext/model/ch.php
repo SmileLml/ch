@@ -1,5 +1,26 @@
 <?php
 /**
+ * Get project pairs for testcase.
+ * 
+ * @param  int    productID
+ * @param  int    branch
+ * @param  int    projectID
+ * @access public
+ * @return array
+ */
+public function getPairsForTestcase($productID, $branch, $projectID)
+{
+    $projectIdList = $this->dao->select('project')->from('zt_projectproduct')->where
+    ('product')->eq($productID)->andWhere('branch')->eq($branch)->fetchPairs('project');
+
+    return $this->dao->select('id, name')->from(TABLE_PROJECT)
+        ->where('project')->eq($projectID)
+        ->andWhere('deleted')->eq(0)
+        ->andWhere('id')->in($projectIdList)
+        ->fetchPairs('id', 'name');;
+}
+
+/**
  * Print html for tree.
  *
  * @param object $trees
@@ -854,11 +875,24 @@ public function buildStorySearchForm($products, $branchGroups, $modules, $queryI
     if($storyType == 'requirement')
     {
         unset($this->config->product->search['fields']['plan']);
+        unset($this->config->product->search['fields']['relatedRequirement']);
         if($project->model == 'ipd')
         {
             unset($this->config->product->search['fields']['stage']);
             unset($this->config->product->search['fields']['status']);
         }
+    }
+
+    if(isset($this->config->product->search['fields']['relatedRequirement']))
+    {
+
+        $requirementPairs = $this->dao->select('id,title')->from('zt_story')
+            ->where('deleted')->eq('0')
+            ->andWhere('type')->eq('requirement')
+            ->andWhere('product')->in($productIdList)
+            ->fetchPairs();
+
+        $this->config->product->search['params']['relatedRequirement']['values'] = array('' => '') + $requirementPairs;
     }
 
     $this->loadModel('search')->setSearchParams($this->config->product->search);

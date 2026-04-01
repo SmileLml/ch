@@ -14,6 +14,7 @@ class myStory extends story
      */
     public function view($storyID, $version = 0, $param = 0, $storyType = 'story')
     {
+        $this->session->set('businessViewBackUrl', $this->app->getURI());
         $story = $this->story->getById($storyID, $version, true);
         if($this->config->edition == 'ipd' and $story->type == 'story') $story = $this->story->getAffectObject('', $story->type, $story);
 

@@ -508,4 +508,39 @@ class deptModel extends model
         krsort($tree);
         return array_pop($tree);
     }
+
+    /**
+     * Get option menu of departments.
+     *
+     * @param  int    $rootDeptID
+     * @param  int    $grade
+     * @access public
+     * @return array
+     */
+    public function getOptionMenuByGrade($rootDeptID = 0, $grade = 0)
+    {
+        $gradeDepts = $this->dao->select('id, name, path')->from(TABLE_DEPT)
+            ->beginIF($grade > 0)->where('grade')->eq($grade)->fi()
+            ->orderBy('grade desc, `order`')
+            ->fetchAll('id');
+
+        $depts = $this->dao->select('id, name')->from(TABLE_DEPT)->fetchPairs('id', 'name');
+
+        $dropMenu = [];
+        foreach($gradeDepts as $dept)
+        {
+            $parentDepts = explode(',', $dept->path);
+            $deptName = '/';
+            foreach($parentDepts as $parentDeptID)
+            {
+                if(empty($parentDeptID)) continue;
+                $deptName .= $depts[$parentDeptID] . '/';
+            }
+            $deptName = rtrim($deptName, '/');
+
+            $dropMenu[$dept->id] = $deptName;
+        }
+
+        return $dropMenu;
+    }
 }

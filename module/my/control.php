@@ -198,15 +198,23 @@ class my extends control
             $meetingCount = $pager->recTotal;
         }
 
+        $businessList  = $this->my->getBusinessList($this->app->user->account, $pager);
+        $businessCount = $pager->recTotal;
+
+        $projectapprovalList  = $this->my->getProjectapprovalList($this->app->user->account, $pager);
+        $projectapprovalCount = $pager->recTotal;
+
         if($this->app->viewType != 'json')
         {
 echo <<<EOF
 <script>
-var taskCount     = $taskCount;
-var storyCount    = $storyCount;
-var bugCount      = $bugCount;
-var caseCount     = $caseCount;
-var testTaskCount = $testTaskCount;
+var taskCount            = $taskCount;
+var storyCount           = $storyCount;
+var bugCount             = $bugCount;
+var caseCount            = $caseCount;
+var testTaskCount        = $testTaskCount;
+var businessCount        = $businessCount;
+var projectapprovalCount = $projectapprovalCount;
 
 var isOpenedURAndSR = $isOpenedURAndSR;
 if(isOpenedURAndSR !== 0) var requirementCount = $requirementCount;
@@ -245,8 +253,10 @@ EOF;
      * @access public
      * @return void
      */
-    public function contribute($mode = 'task', $type = 'openedBy', $param = 0, $orderBy = 'id_desc', $recTotal = 0, $recPerPage = 20, $pageID = 1)
+    public function contribute($mode = 'task', $type = 'openedBy', $param = 0, $orderBy = '', $recTotal = 0, $recPerPage = 20, $pageID = 1)
     {
+        if($orderBy == '') $orderBy = $mode == 'audit' ? 'time_desc' : 'id_desc';
+        
         if(($mode == 'issue' or $mode == 'risk') and $type == 'openedBy') $type = 'createdBy';
 
         echo $this->fetch('my', $mode, "type=$type&param=$param&orderBy=$orderBy&recTotal=$recTotal&recPerPage=$recPerPage&pageID=$pageID");

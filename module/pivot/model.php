@@ -3160,6 +3160,1470 @@ class pivotModel extends model
 
         return array($data, $configs);
     }
+
+    public function getCustomOptions($type)
+    {
+        $options = array();
+        switch($type)
+        {
+            case 'program':
+                $options = $this->dao->select('id,name')->from(TABLE_PROJECT)
+                    ->where('deleted')->eq(0)
+                    ->andWhere('`type`')->eq('program')
+                    ->fetchPairs();
+                break;
+            case 'project':
+                $options = $this->dao->select('id,name')->from(TABLE_PROJECT)
+                    ->where('deleted')->eq(0)
+                    ->andWhere('`type`')->eq('project')
+                    ->fetchPairs();
+                break;
+            case 'projectStatus':
+                $this->app->loadLang('project');
+                $options = $this->lang->project->statusList;
+                break;
+            case 'proposalType':
+                $options = array('YH' => 'YH', 'WH' => 'WH');
+                break;
+            case 'sprint':
+                $options = $this->dao->select('id,name')->from(TABLE_CHPROJECT)
+                    ->where('deleted')->eq(0)
+                    ->fetchPairs();
+                break;
+            case 'team':
+                $options = $this->dao->select('id,name')->from(TABLE_CHTEAM)
+                    ->where('deleted')->eq(0)
+                    ->fetchPairs();
+                break;
+            case 'executionStatus':
+                $this->app->loadLang('execution');
+                $options = $this->lang->execution->statusList;
+                break;
+            case 'storyStage':
+                $this->app->loadLang('story');
+                $stageList = $this->lang->story->stageList;
+                $statusList = $this->lang->story->statusList;
+                foreach($stageList as $key => $value)
+                {
+                    if(empty($value)) continue;
+                    $options['stage_' . $key] = $value . '阶段';
+                }
+                foreach($statusList as $key => $value)
+                {
+                    if(empty($value)) continue;
+                    $options['status_' . $key] = $value . '状态';
+                }
+                break;
+            case 'storyType':
+                $this->app->loadLang('story');
+                $options = $this->lang->story->categoryList;
+                break;
+            case 'bugType':
+                $this->app->loadLang('bug');
+                $options = $this->lang->bug->typeList;
+                break;
+            case 'bugStatus':
+                $this->app->loadLang('bug');
+                $options = $this->lang->bug->statusList;
+                break;
+            case 'defectedinversion':
+                $options = $this->dao->select('options')
+                    ->from(TABLE_WORKFLOWFIELD)
+                    ->where('module')->eq('bug')
+                    ->andWhere('field')->eq('defectedinversion')
+                    ->fetch('options');
+                $options = json_decode($options, true);
+                break;
+            case 'program':
+                $options = $this->loadModel('program')->getPairs();
+                break;
+            case 'project':
+                $options = $this->loadModel('project')->getPairs();
+                break;
+            case 'projectStatus':
+                $this->app->loadLang('project');
+                $options = $this->lang->project->statusList;
+                break;
+            case 'projectedType':
+                $options = $this->dao->select('options')
+                    ->from(TABLE_WORKFLOWFIELD)
+                    ->where('module')->eq('project')
+                    ->andWhere('field')->eq('proposalType')
+                    ->fetch('options');
+                $options = json_decode($options, true);
+                break;
+        }
+        if(!is_array($options)) return array();
+
+        $options[''] = '';
+        return $options;
+    }
+
+    public function getCustomStoryStateDate($storys, $stage)
+    {
+        $storyIDs = array_keys($storys);
+        switch($stage)
+        {
+            case 'stage_wait':
+            case 'stage_projected':
+            case 'stage_released':
+            case 'stage_closed':
+            case 'status_draft':
+            case 'status_reviewing':
+            case 'status_active':
+            case 'status_closed':
+            case 'status_changing':
+            case 'status_PRDReviewing':
+            case 'status_PRDReviewed':
+            case 'status_confirming':
+            case 'status_beOnline':
+            case 'status_cancelled':
+            case 'stage_verified':
+                $actions = $this->dao->select('objectID as story, max(`date`) as `date`')
+                    ->from(TABLE_ACTION)
+                    ->where('objectType')->eq('story')
+                    ->andWhere('objectID')->in($storyIDs)
+                    ->beginIF($stage == 'stage_wait' || $stage == 'status_draft')->andWhere('`action`', true)->eq('opened')->fi()
+                    ->beginIF($stage == 'stage_projected')->andWhere('`action`', true)->in('linked2project,linked2execution')->fi()
+                    ->beginIF($stage == 'status_beOnline' || $stage == 'stage_verified')->andWhere('`action`', true)->in('verified')->fi()
+                    ->beginIF($stage == 'stage_released')->andWhere('`action`', true)->eq('linked2release')->fi()
+                    ->beginIF($stage == 'stage_closed' || $stage == 'status_closed')->andWhere('`action`', true)->eq('closed')->fi()
+                    ->beginIF($stage == 'status_active')->andWhere('`action`', true)->in('activated,opened,openedbydemand')->fi()
+                    ->beginIF($stage == 'status_changing')->andWhere('`action`', true)->eq('changed')->fi()
+                    ->beginIF($stage == 'status_PRDReviewing' || $stage == 'status_PRDReviewed')->andWhere('`action`', true)->eq('prdpingshen')->fi()
+                    ->orWhere('`action`')->eq('change' . str_replace('_', '', $stage))->markRight(1)
+                    ->groupBy('objectID')
+                    ->fetchPairs('story', 'date');
+                break;
+            case 'stage_planned':
+                $actions = $this->dao->select('t1.story as story, t2.begin as `date`')
+                    ->from(TABLE_PLANSTORY)->alias('t1')
+                    ->leftJoin(TABLE_PRODUCTPLAN)->alias('t2')->on('t1.plan = t2.id')
+                    ->where('t1.story')->in($storyIDs)
+                    ->fetchPairs('story', 'date');
+                break;
+            case 'stage_developing':
+            case 'stage_developed':
+            case 'stage_testing':
+            case 'stage_tested':
+            case 'status_devInProgress':
+                $taskActions = $this->dao->select('t2.story, max(`date`) as `date`')
+                    ->from(TABLE_ACTION)->alias('t1')
+                    ->leftJoin(TABLE_TASK)->alias('t2')->on('t1.objectID = t2.id')
+                    ->where('t1.objectType')->eq('task')
+                    ->andWhere('t2.story')->in($storyIDs)
+                    ->beginIF($stage == 'stage_developing')->andWhere('`action`')->eq('started')->andWhere('t2.type')->eq('devel')->fi()
+                    ->beginIF($stage == 'stage_developed')->andWhere('`action`')->eq('finished')->andWhere('t2.type')->eq('devel')->fi()
+                    ->beginIF($stage == 'stage_testing')->andWhere('`action`')->eq('started')->andWhere('t2.type')->eq('test')->fi()
+                    ->beginIF($stage == 'stage_tested')->andWhere('`action`')->eq('finished')->andWhere('t2.type')->eq('test')->fi()
+                    ->beginIF($stage == 'status_devInProgress')->andWhere('`action`')->eq('started')->andWhere('t2.type')->eq('devel')->fi()
+                    ->groupBy('t2.story')
+                    ->fetchPairs('story', 'date');
+                $actions = $this->dao->select('objectID as story, max(`date`) as `date`')
+                    ->from(TABLE_ACTION)
+                    ->where('objectType')->eq('story')
+                    ->andWhere('objectID')->in($storyIDs)
+                    ->andwhere('`action`')->eq('change' . str_replace('_', '', $stage))
+                    ->groupBy('objectID')
+                    ->fetchPairs('story', 'date');
+                $merged = $actions + $taskActions;
+                foreach ($actions as $id => $date) {
+                    if (isset($taskActions[$id])) {
+                        $merged[$id] = max($date, $taskActions[$id]);
+                    }
+                }
+                $actions = $merged;
+                break;
+        }
+
+        return $actions;
+    }
+
+    public function getCustomStoryStage($storys, $beginStage, $endStage)
+    {
+        $beginDates = $this->getCustomStoryStateDate($storys, $beginStage);
+        $endDates   = $this->getCustomStoryStateDate($storys, $endStage);
+
+        $filterStorys = array();
+        foreach($storys as $storyID => $story)
+        {
+            if(!isset($beginDates[$storyID]) || !isset($endDates[$storyID])) continue;
+            $beginStage = $beginDates[$storyID];
+            $endStage   = $endDates[$storyID];
+
+            $story->storyCycle      = round(abs(strtotime($endStage) - strtotime($beginStage)) / (60 * 60 * 24));
+            $story->beginStage      = $beginStage;
+            $story->endStage        = $endStage;
+            $filterStorys[$storyID] = $story;
+        }
+        return $filterStorys;
+    }
+
+    public function getCustomStoryList($executionIDs, $stage = '', $begin = '', $end = '')
+    {
+        $storys = $this->dao->select('t1.id, t1.title as name, t1.estimate, t1.category, t3.id as executionID, 0 as taskConsumed')
+            ->from(TABLE_STORY)->alias('t1')
+            ->leftJoin(TABLE_PROJECTSTORY)->alias('t2')->on('t2.story = t1.id')
+            ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t3.id = t2.project')
+            ->where('t3.id')->in($executionIDs)
+            ->andWhere('t1.deleted')->eq(0)
+            ->fetchAll('id');
+
+        if(empty($stage)) return $storys;
+
+        $dates = $this->getCustomStoryStateDate($storys, $stage);
+
+        $filterStorys = array();
+        foreach($storys as $storyID => $story)
+        {
+            if(isset($dates[$storyID]) && $dates[$storyID] >= $begin && $dates[$storyID] <= ($end . ' 23:59:59')) $filterStorys[$storyID] = $story;
+        }
+
+        return $filterStorys;
+    }
+
+    public function getCustomBugStateDate($bugs, $status)
+    {
+        return $this->dao->select('objectID as bug, MIN(`date`) as `date`')
+            ->from(TABLE_ACTION)
+            ->where('objectType')->eq('bug')
+            ->andWhere('objectID')->in(array_keys($bugs))
+            ->beginIF('active' == $status)->andWhere('`action`')->in('opened, activated')->fi()
+            ->beginIF('resolved' == $status)->andWhere('`action`')->eq('resolved')->fi()
+            ->beginIF('closed'== $status)->andWhere('`action`')->eq('closed')->fi()
+            ->groupBy('objectID')
+            ->fetchPairs('bug', 'date');
+    }
+
+    public function getCustomBugStage($bugs, $beginStage, $endStage)
+    {
+        $beginDates = $this->getCustomBugStateDate($bugs, $beginStage);
+        $endDates   = $this->getCustomBugStateDate($bugs, $endStage);
+
+        $filterBugs = array();
+        foreach($bugs as $bugID => $bug)
+        {
+            if(!isset($beginDates[$bugID]) || !isset($endDates[$bugID])) continue;
+            $beginStage = $beginDates[$bugID];
+            $endStage   = $endDates[$bugID];
+
+            $bug->bugCycle      = round(abs(strtotime($endStage) - strtotime($beginStage)) / (60 * 60 * 24));
+            $bug->beginStage    = $beginStage;
+            $bug->endStage      = $endStage;
+            $filterBugs[$bugID] = $bug;
+        }
+        return $filterBugs;
+    }
+
+    public function getCustomBugList($executionIDs, $status = array(), $bugEnd = '', $begin = '', $end = '')
+    {
+        $status = array_filter($status);
+        $bugs = $this->dao->select('t1.id, t1.title as name, t3.id as executionID')
+            ->from(TABLE_BUG)->alias('t1')
+            ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t3.id = t1.execution')
+            ->where('t3.id')->in($executionIDs)
+            ->beginIF(!empty($status))->andWhere('t1.defectedinversion')->in($status)->fi()
+            ->andWhere('t1.deleted')->eq(0)
+            ->fetchAll('id');
+
+        $actions = $this->dao->select('objectID as bug, MIN(`date`) as `date`')
+            ->from(TABLE_ACTION)
+            ->where('objectType')->eq('bug')
+            ->andWhere('objectID')->in(array_keys($bugs))
+            ->beginIF($bugEnd === 'active')->andWhere('`action`')->in('opened, activated')->fi()
+            ->beginIF($bugEnd === 'resolved')->andWhere('`action`')->eq('resolved')->fi()
+            ->beginIF($bugEnd === 'closed')->andWhere('`action`')->eq('closed')->fi()
+            ->groupBy('objectID')
+            ->fetchAll('bug');
+
+        $filterBugs = array();
+        foreach($bugs as $bugID => $bug)
+        {
+            if(isset($actions[$bugID]) && $actions[$bugID]->date >= $begin && $actions[$bugID]->date <= ($end . ' 23:59:59')) $filterBugs[$bugID] = $bug;
+        }
+
+        return $filterBugs;
+    }
+
+    public function getCustomTaskList($storyIDs)
+    {
+        if(empty($storyIDs)) return array();
+        return $this->dao->select('t2.story, t1.consumed, t1.account')
+            ->from(TABLE_EFFORT)->alias('t1')
+            ->leftJoin(TABLE_TASK)->alias('t2')->on("t1.objectID = t2.id and t1.objectType = 'task'")
+            ->where('t2.story')->in($storyIDs)
+            ->andWhere('t1.deleted')->eq(0)
+            ->andWhere('t2.deleted')->eq(0)
+            ->fetchAll();
+    }
+
+    public function getCustomStoryDataWithDate($executions, $category, $stage, $begin, $end)
+    {
+        $executionIDs = array_keys($executions);
+        $storys = $this->getCustomStoryList($executionIDs, $stage, $begin, $end);
+        $tasks = $this->getCustomTaskList(array_keys($storys));
+        foreach($tasks as $task) $storys[$task->story]->taskConsumed += $task->consumed;
+
+        foreach($executions as $execution)
+        {
+           $execution->storyCount    = 0;
+           $execution->storyEstimate = 0;
+           $execution->consumed      = 0;
+           $execution->taskConsumed  = 0;
+        }
+
+        foreach($storys as $story)
+        {
+            $executionID = $story->executionID;
+            $executions[$executionID]->taskConsumed += $story->taskConsumed;
+
+            if(!in_array($story->category, $category)) continue;
+
+            /* 需求个数。*/
+            $executions[$executionID]->storyCount    += 1;
+            /* 需求规模。*/
+            $executions[$executionID]->storyEstimate += $story->estimate;
+            /* 工时消耗。*/
+            $executions[$executionID]->consumed      += $story->taskConsumed;
+        }
+    }
+
+    public function getCustomStoryDataWithoutDate($executions, $category)
+    {
+        $executionIDs = array_keys($executions);
+        $storys = $this->getCustomStoryList($executionIDs);
+        // $tasks = $this->getCustomTaskList(array_keys($storys));
+        // foreach($tasks as $task) $storys[$task->story]->taskConsumed += $task->consumed;
+
+        foreach($executions as $execution)
+        {
+           // $execution->taskConsumed     = 0;
+           $execution->allStoryEstimate = 0;
+           $execution->allStoryCount    = 0;
+        }
+
+        foreach($storys as $story)
+        {
+            $executionID = $story->executionID;
+            $execution = $executions[$executionID];
+
+            /* 所有工时消耗。*/
+            // $executions[$executionID]->taskConsumed += $story->taskConsumed;
+            /* 所有需求规模。*/
+            $executions[$executionID]->allStoryEstimate += $story->estimate;
+            /* 所有符合筛选器类型要求的需求个数。*/
+            if(!in_array($story->category, $category)) continue;
+            $executions[$executionID]->allStoryCount++;
+        }
+    }
+
+    public function setWorkingDays($executions, $dimension, $begin, $end, $sprints)
+    {
+        $sprintWorkingDays = array();
+        foreach($executions as $executionID => $execution)
+        {
+            $sprint   = $sprints[$executionID];
+            $sprintID = $sprint->chExecutionID;
+            $status   = $execution->status;
+            if(!isset($sprintWorkingDays[$sprintID])) $sprintWorkingDays[$sprintID] = array();
+            if($status === 'wait') continue;
+
+            if($dimension !== 'team')
+            {
+                $begin = helper::isZeroDate($execution->realBegan) ? $execution->begin : $execution->realBegan;
+                $end   = helper::isZeroDate($execution->realEnd) ? $execution->end : $execution->realEnd;
+                if($status === 'doing') $end = helper::today();
+            }
+
+            $workingDays = $this->loadModel('holiday')->getActualWorkingDays($begin, $end);
+            $sprintWorkingDays[$sprintID] = array_merge($sprintWorkingDays[$sprintID], $workingDays);
+        }
+
+        foreach($executions as $executionID => $execution)
+        {
+            $sprint   = $sprints[$executionID];
+            $sprintID = $sprint->chExecutionID;
+            $execution->workingDays = array_unique($sprintWorkingDays[$sprintID]);
+        }
+    }
+
+    public function getCustomParticipants($executions)
+    {
+        $executionIDs = array_keys($executions);
+        $efforts = $this->dao->select('t2.execution, t1.account, t1.`date`, sum(t1.consumed) as consumed')
+            ->from(TABLE_EFFORT)->alias('t1')
+            ->leftJoin(TABLE_TASK)->alias('t2')->on("t1.objectID = t2.id")
+            ->where('t2.execution')->in($executionIDs)
+            ->andWhere('t1.deleted')->eq(0)
+            ->andWhere('t2.deleted')->eq(0)
+            ->andWhere('t1.objectType')->eq('task')
+            ->groupBy('t1.account, t1.`date`')
+            ->fetchAll();
+
+        foreach($efforts as $effort)
+        {
+            $executionID = $effort->execution;
+            $execution   = $executions[$executionID];
+            $workingDays = $execution->workingDays;
+            if(!in_array($effort->date, $workingDays)) continue;
+
+            $execution->participants += $effort->consumed >= 8 ? 8 : $effort->consumed;
+        }
+
+        foreach($executions as $execution)
+        {
+            $participants = $execution->participants;
+            $workingDays  = $execution->workingDays;
+            if($participants == 0 || count($workingDays) == 0)
+            {
+                $execution->participants = 0;
+            }
+            else
+            {
+                $execution->participants = $participants / (count($workingDays) * 8);
+            }
+        }
+    }
+
+    public function getExecutionsWithTeam($params, $pager = null)
+    {
+        $team = array_filter(zget($params, 'team', array()));
+        $teams = $this->dao->select('id,name')->from(TABLE_CHTEAM)
+            ->where('deleted')->eq(0)
+            ->beginIF(!empty($team))->andWhere('id')->in($team)->fi()
+            ->orderBy('id')
+            ->page($pager)
+            ->fetchAll('id');
+
+        $executions = $this->dao->select('t4.id as executionID, t1.id as teamID, t1.name as team')
+            ->from(TABLE_CHTEAM)->alias('t1')
+            ->leftJoin(TABLE_CHPROJECTTEAM)->alias('t2')->on('t1.id = t2.team')
+            ->leftJoin(TABLE_CHPROJECTINTANCES)->alias('t3')->on('t2.project = t3.ch')
+            ->leftJoin(TABLE_PROJECT)->alias('t4')->on('t4.id = t3.zentao')
+            ->where('t1.deleted')->eq(0)
+            ->andWhere('t4.deleted')->eq(0)
+            ->andWhere('t4.type')->in('sprint,stage,kanban')
+            ->andWhere('t1.id')->in(array_keys($teams))
+            ->fetchAll('executionID');
+
+        return array($teams, $executions);
+    }
+
+    public function getExecutionsWithSprint($params, $pager = null)
+    {
+        $team         = array_filter(zget($params, 'team', array()));
+        $sprints      = array_filter(zget($params, 'sprint', array()));
+        $sprintStatus = array_filter(zget($params, 'sprintStatus', array('closed')));
+
+        $sprints = $this->getCustomBugExecutionsWithExecution($team, $sprints, $sprintStatus);
+        list($sprints, $recTotal, $pageTotal) = $this->pageObject($sprints, $pager->recPerPage, $pager->pageID);
+        $pager->recTotal  = $recTotal;
+        $pager->pageTotal = $pageTotal;
+
+        $executions = $this->dao->select('t4.id as executionID, t1.id as teamID, t1.name as team, t2.project as chExecutionID')
+            ->from(TABLE_CHTEAM)->alias('t1')
+            ->leftJoin(TABLE_CHPROJECTTEAM)->alias('t2')->on('t1.id = t2.team')
+            ->leftJoin(TABLE_CHPROJECTINTANCES)->alias('t3')->on('t2.project = t3.ch')
+            ->leftJoin(TABLE_PROJECT)->alias('t4')->on('t4.id = t3.zentao')
+            ->where('t1.deleted')->eq(0)
+            ->andWhere('t4.deleted')->eq(0)
+            ->andWhere('t4.type')->in('sprint,stage,kanban')
+            ->andWhere('t2.project')->in(array_keys($sprints))
+            ->beginIF(!empty($team))->andWhere('t1.id')->in($team)->fi()
+            ->fetchAll('executionID');
+
+        foreach($executions as $execution)
+        {
+            $chExecutionID = $execution->chExecutionID;
+            $execution->chExecutionName = $sprints[$chExecutionID]->name;
+        }
+
+        return $executions;
+    }
+
+    public function getExecutionsWithProject($params, $pager = null)
+    {
+        $program       = array_filter(zget($params, 'program', array()));
+        $project       = array_filter(zget($params, 'project', array()));
+        $projectStatus = array_filter(zget($params, 'projectStatus', array()));
+        $projectedType = array_filter(zget($params, 'projectedType', array()));
+
+        $projectIDs = $this->dao->select('distinct project as project')->from(TABLE_PROJECT)
+            ->where('deleted')->eq(0)
+            ->andWhere('type')->in('sprint,stage,kanban')
+            ->fetchAll('project');
+
+        $projects = $this->dao->select("t2.id as projectID,t2.name as project, t3.id as programID, if(t3.name is null, '/', t3.name) as program")
+            ->from(TABLE_PROJECT)->alias('t2')
+            ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t3.id = t2.parent')
+            ->where('t2.deleted')->eq('0')
+            ->andWhere('t2.type')->eq('project')
+            ->andWhere('t2.id')->in(array_keys($projectIDs))
+            ->beginIF(!empty($program))->andWhere("t2.parent")->in($program)->fi()
+            ->beginIF(!empty($project))->andWhere('t2.id')->in($project)->fi()
+            ->beginIF(!empty($projectStatus))->andWhere('t2.status')->in($projectStatus)->fi()
+            ->beginIF(!empty($projectedType))->andWhere('t2.proposalType')->in($projectedType)->fi()
+            ->orderBy('t2.id')
+            ->page($pager)
+            ->fetchAll('projectID');
+
+        $executions = $this->dao->select('t1.id as executionID, t1.project')
+            ->from(TABLE_EXECUTION)->alias('t1')
+            ->where('t1.deleted')->eq(0)
+            ->andWhere('t1.project')->in(array_keys($projects))
+            ->andWhere('t1.type')->in('sprint,stage,kanban')
+            ->fetchAll('executionID');
+
+        foreach($executions as $execution)
+        {
+            $execution->projectID   = $execution->project;
+            $execution->programID   = $projects[$execution->project]->programID;
+            $execution->projectName = $projects[$execution->project]->project;
+            $execution->programName = $projects[$execution->project]->program;
+        }
+
+        return $executions;
+    }
+
+    public function groupCustomStoryDataByTeam($executions, $teams, $relations)
+    {
+        $teamResult = array();
+
+        foreach($teams as $team)
+        {
+            $teamID = $team->id;
+            $result = new stdclass();
+            $result->team = $team->name;
+            $result->storyCount = 0;
+            $result->storyEstimate = 0;
+            $result->consumed = 0;
+            $result->participants = 0;
+            $result->taskConsumed = 0;
+            $result->allStoryEstimate = 0;
+            $result->allStoryCount = 0;
+            $result->workingDays = array();
+
+            $teamResult[$teamID] = $result;
+        }
+
+        foreach($executions as $id => $execution)
+        {
+            $team     = $relations[$id];
+            $teamID   = $team->teamID;
+            $teamName = $team->team;
+
+            $teamData = $teamResult[$teamID];
+            $teamData->storyCount       += $execution->storyCount;
+            $teamData->storyEstimate    += $execution->storyEstimate;
+            $teamData->consumed         += $execution->consumed;
+            $teamData->participants     += $execution->participants;
+            $teamData->taskConsumed     += $execution->taskConsumed;
+            $teamData->allStoryEstimate += $execution->allStoryEstimate;
+            $teamData->allStoryCount    += $execution->allStoryCount;
+            if(!empty($execution->workingDays)) $teamData->workingDays = $execution->workingDays;
+        }
+
+        foreach($teamResult as $teamData)
+        {
+            $dateCycle        = count($teamData->workingDays);
+            $participants     = $teamData->participants;
+            $storyCount       = $teamData->storyCount;
+            $consumed         = $teamData->consumed / 8;
+            $storyEstimate    = $teamData->storyEstimate;
+            $taskConsumed     = $teamData->taskConsumed;
+            $allStoryEstimate = $teamData->allStoryEstimate;
+            $allStoryCount    = $teamData->allStoryCount;
+
+            $teamData->productivity = $storyEstimate === 0 || $taskConsumed === 0                        ? 0 : round($storyEstimate / ($taskConsumed / 8), 2);
+            $teamData->finishRate   = $storyCount === 0 || $allStoryCount === 0                          ? 0 : round($storyCount / $allStoryCount, 2);
+            $teamData->load         = $allStoryEstimate === 0 || $participants === 0 || $dateCycle === 0 ? 0 : round($allStoryEstimate / ($participants * $dateCycle * 8), 2);
+            $teamData->planRate     = $storyEstimate === 0 || $participants === 0                        ? 0 : round($storyEstimate / $participants, 2);
+            $teamData->actualRate   = $consumed === 0 || $participants === 0                             ? 0 : round($consumed / $participants, 2);
+            $teamData->participants = round($participants, 2);
+            $teamData->consumed     = round($consumed, 2);
+        }
+
+        return $teamResult;
+    }
+
+    public function groupCustomStoryDataBySprint($executions, $sprints)
+    {
+        $result = array();
+        foreach($executions as $id => $execution)
+        {
+            $sprint     = $sprints[$id];
+            $sprintID   = $sprint->chExecutionID;
+            $sprintName = $sprint->chExecutionName;
+            $teamID     = $sprint->teamID;
+            $teamName   = $sprint->team;
+
+            $key = "{$teamID}_{$sprintID}";
+            if(!isset($result[$key]))
+            {
+                $execution->team      = $teamName;
+                $execution->execution = $sprintName;
+                $result[$key]         = $execution;
+                continue;
+            }
+
+            $data = $result[$key];
+            $data->storyCount       += $execution->storyCount;
+            $data->storyEstimate    += $execution->storyEstimate;
+            $data->consumed         += $execution->consumed;
+            $data->participants     += $execution->participants;
+            $data->taskConsumed     += $execution->taskConsumed;
+            $data->allStoryEstimate += $execution->allStoryEstimate;
+            $data->allStoryCount    += $execution->allStoryCount;
+            $data->workingDays      = array_merge($data->workingDays, $execution->workingDays);
+        }
+
+        foreach($result as $data)
+        {
+            $dateCycle        = count(array_unique($data->workingDays));
+            $participants     = $data->participants;
+            $storyCount       = $data->storyCount;
+            $storyEstimate    = $data->storyEstimate;
+            $taskConsumed     = $data->taskConsumed;
+            $allStoryEstimate = $data->allStoryEstimate;
+            $allStoryCount    = $data->allStoryCount;
+            $consumed         = $data->consumed / 8;
+
+            $data->productivity = $storyEstimate === 0 || $taskConsumed === 0                        ? 0 : round($storyEstimate / ($taskConsumed / 8), 2);
+            $data->finishRate   = $storyCount === 0 || $allStoryCount === 0                          ? 0 : round($storyCount / $allStoryCount, 2);
+            $data->load         = $allStoryEstimate === 0 || $participants === 0 || $dateCycle === 0 ? 0 : round($allStoryEstimate / ($participants * $dateCycle * 8), 2);
+            $data->planRate     = $storyEstimate === 0 || $participants === 0                        ? 0 : round($storyEstimate / $participants, 2);
+            $data->actualRate   = $consumed === 0 || $participants === 0                             ? 0 : round($consumed / $participants, 2);
+            $data->participants = round($participants, 2);
+            $data->consumed     = round($consumed, 2);
+        }
+
+        ksort($result);
+
+        return $result;
+    }
+
+    public function groupCustomStoryDataByProject($executions, $projects)
+    {
+        $result = array();
+        foreach($executions as $id => $execution)
+        {
+            $project     = $projects[$id];
+            $projectID   = $project->projectID;
+            $projectName = $project->projectName;
+            $programID   = $project->programID;
+            $programName = $project->programName;
+
+            $key = "{$programID}_{$projectID}";
+            if(!isset($result[$key]))
+            {
+                $execution->program = $programName;
+                $execution->project = $projectName;
+                $result[$key]       = $execution;
+                continue;
+            }
+
+            $data = $result[$key];
+            $data->storyCount       += $execution->storyCount;
+            $data->storyEstimate    += $execution->storyEstimate;
+            $data->consumed         += $execution->consumed;
+            $data->taskConsumed     += $execution->taskConsumed;
+            $data->allStoryCount    += $execution->allStoryCount;
+        }
+
+        foreach($result as $data)
+        {
+            $storyCount       = $data->storyCount;
+            $storyEstimate    = $data->storyEstimate;
+            $taskConsumed     = $data->taskConsumed;
+            $allStoryCount    = $data->allStoryCount;
+            $consumed         = $data->consumed / 8;
+
+            $data->productivity = $storyEstimate === 0 || $taskConsumed === 0 ? 0 : round($storyEstimate / ($taskConsumed / 8), 2);
+            $data->finishRate   = $storyCount === 0 || $allStoryCount === 0   ? 0 : round($storyCount / $allStoryCount, 2);
+            $data->consumed     = round($consumed, 2);
+        }
+
+        ksort($result);
+
+        return $result;
+    }
+
+    public function groupCustomCycleDataByTeam($teams, $allTeams)
+    {
+        $result = array();
+
+        foreach($allTeams as $team)
+        {
+            $teamID = $team->id;
+            $teamResult = new stdclass();
+            $teamResult->team       = $team->name;
+            $teamResult->storyCount = 0;
+            $teamResult->storyCycle = 0;
+            $teamResult->bugCount   = 0;
+            $teamResult->bugCycle   = 0;
+            $teamResult->storys     = array();
+            $teamResult->bugs       = array();
+
+            $result[$teamID] = $teamResult;
+        }
+
+        foreach($teams as $team)
+        {
+            $teamID = $team->teamID;
+            if(!isset($result[$teamID])) continue;
+
+            $result[$teamID]->storyCount += $team->storyCount;
+            $result[$teamID]->storyCycle += $team->storyCycle;
+            $result[$teamID]->bugCount   += $team->bugCount;
+            $result[$teamID]->bugCycle   += $team->bugCycle;
+            $result[$teamID]->storys     = array_merge($result[$teamID]->storys, $team->storys);
+            $result[$teamID]->bugs       = array_merge($result[$teamID]->bugs, $team->bugs);
+        }
+
+        foreach($result as $data)
+        {
+            $data->storyCycle = $data->storyCycle === 0 ? 0 : round($data->storyCycle / $data->storyCount, 2);
+            $data->bugCycle   = $data->bugCycle === 0   ? 0 : round($data->bugCycle / $data->bugCount, 2);
+        }
+
+        return $result;
+    }
+
+    public function groupCustomCycleDataByProject($projects)
+    {
+        $result = array();
+        foreach($projects as $project)
+        {
+            $projectID = $project->projectID;
+            $programID = $project->programID;
+
+            $key = "{$programID}_{$projectID}";
+            if(!isset($result[$key]))
+            {
+                $project->program = $project->programName;
+                $project->project = $project->projectName;
+                $result[$key] = $project;
+                continue;
+            }
+
+            $result[$key]->storyCount += $project->storyCount;
+            $result[$key]->storyCycle += $project->storyCycle;
+            $result[$key]->bugCount   += $project->bugCount;
+            $result[$key]->bugCycle   += $project->bugCycle;
+            $result[$key]->storys     = array_merge($result[$key]->storys, $project->storys);
+            $result[$key]->bugs       = array_merge($result[$key]->bugs, $project->bugs);
+        }
+
+        foreach($result as $data)
+        {
+            $data->storyCycle = $data->storyCycle === 0 ? 0 : round($data->storyCycle / $data->storyCount, 2);
+            $data->bugCycle   = $data->bugCycle === 0   ? 0 : round($data->bugCycle / $data->bugCount, 2);
+        }
+
+        return $result;
+    }
+
+    public function buildDrilldownParams($result)
+    {
+        foreach($result as $data)
+        {
+            $data->storyDrill = array();
+            $data->bugDrill   = array();
+            if(!empty($data->storys))
+            {
+                foreach($data->storys as $story)
+                {
+                    $link = helper::createLink('story', 'view', "id=$story->id");
+                    $drillData = array();
+                    $drillData['id']    = $story->id;
+                    $drillData['name']  = html::a($link, $story->name);
+                    $drillData['rawName'] = $story->name;
+                    $drillData['begin'] = $story->beginStage;
+                    $drillData['end']   = $story->endStage;
+                    $drillData['days']  = round((strtotime($story->endStage) - strtotime($story->beginStage)) / (60 * 60 * 24), 2);
+                    $data->storyDrill[] = $drillData;
+                }
+            }
+
+            if(!empty($data->bugs))
+            {
+                foreach($data->bugs as $bug)
+                {
+                    $link = helper::createLink('bug', 'view', "id=$bug->id");
+                    $drillData = array();
+                    $drillData['id']    = $bug->id;
+                    $drillData['name']  = html::a($link, $bug->name);
+                    $drillData['rawName'] = $bug->name;
+                    $drillData['begin'] = $bug->beginStage;
+                    $drillData['end']   = $bug->endStage;
+                    $drillData['days']  = round((strtotime($bug->endStage) - strtotime($bug->beginStage)) / (60 * 60 * 24), 2);
+                    $data->bugDrill[]   = $drillData;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    public function parseBugParams($params, $dimension)
+    {
+        if(!empty($params)) $params = explode('|', $params);
+
+        if($dimension == 'team')
+        {
+            if(!empty($params))
+            {
+                list($team, $bugType, $begin, $end) = $params;
+                $team    = array_filter(explode(',', $team));
+                $bugType = array_filter(explode(',', $bugType));
+                $begin   = helper::safe64Decode($begin);
+                $end     = helper::safe64Decode($end);
+            }
+            else
+            {
+                $team    = array();
+                $bugType = array();
+                $begin   = date('Y-m-d', strtotime('-2 weeks'));
+                $end     = date('Y-m-d', strtotime('today'));
+            }
+            $parsedParams = array();
+            $parsedParams['team']          = $team;
+            $parsedParams['bugType']       = $bugType;
+            $parsedParams['date']['begin'] = $begin;
+            $parsedParams['date']['end']   = $end;
+            return $parsedParams;
+        }
+        elseif($dimension == 'sprint')
+        {
+            if(!empty($params))
+            {
+                list($team, $executionName, $executionStatus, $bugType) = $params;
+                $team            = array_filter(explode(',', $team));
+                $executionName   = array_filter(explode(',', $executionName));
+                $executionStatus = array_filter(explode(',', $executionStatus));
+                $bugType         = array_filter(explode(',', $bugType));
+            }
+            else
+            {
+                $team            = array();
+                $executionName   = array();
+                $executionStatus = array('closed');
+                $bugType         = array();
+            }
+            $parsedParams = array();
+            $parsedParams['team']            = $team;
+            $parsedParams['executionName']   = $executionName;
+            $parsedParams['executionStatus'] = $executionStatus;
+            $parsedParams['bugType']         = $bugType;
+            return $parsedParams;
+        }
+        elseif($dimension == 'project')
+        {
+            if(!empty($params))
+            {
+                list($program, $project, $projectStatus, $proposalType, $bugType, $begin, $end) = $params;
+                $program       = array_filter(explode(',', $program));
+                $project       = array_filter(explode(',', $project));
+                $projectStatus = array_filter(explode(',', $projectStatus));
+                $proposalType  = array_filter(explode(',', $proposalType));
+                $bugType       = array_filter(explode(',', $bugType));
+                $begin         = helper::safe64Decode($begin);
+                $end           = helper::safe64Decode($end);
+            }
+            else
+            {
+                $options     = $this->getCustomOptions('program');
+                $defaultName = '春航' . date('Y') . '年项目集';
+
+                $program       = in_array($defaultName, $options) ? array(array_search($defaultName, $options)) : array();
+                $project       = array();
+                $projectStatus = array();
+                $proposalType  = array();
+                $bugType       = array();
+                $begin         = date('Y-m-d', strtotime('-2 weeks'));
+                $end           = date('Y-m-d', strtotime('today'));
+            }
+
+            $parsedParams = array();
+            $parsedParams['program']       = $program;
+            $parsedParams['project']       = $project;
+            $parsedParams['projectStatus'] = $projectStatus;
+            $parsedParams['proposalType']  = $proposalType;
+            $parsedParams['bugType']       = $bugType;
+            $parsedParams['date']['begin'] = $begin;
+            $parsedParams['date']['end']   = $end;
+            return $parsedParams;
+        }
+    }
+
+    public function parseParams($params, $method, $dimension)
+    {
+        if(empty($params)) return array();
+        $params = explode('|', $params);
+        if($method === 'story' && $dimension === 'team')
+        {
+            list($team, $stage, $dateBegin, $dateEnd, $type) = $params;
+            $parsedParams = array();
+            $parsedParams['team']  = explode(',', $team);
+            $parsedParams['stage'] = $stage;
+            $parsedParams['begin'] = helper::safe64Decode($dateBegin);
+            $parsedParams['end']   = helper::safe64Decode($dateEnd);
+            $parsedParams['type']  = explode(',', $type);
+            return $parsedParams;
+        }
+
+        if($method === 'story' && $dimension === 'sprint')
+        {
+            list($team, $sprint, $sprintStatus, $stage, $dateBegin, $dateEnd, $type) = $params;
+            $parsedParams = array();
+            $parsedParams['team']         = explode(',', $team);
+            $parsedParams['sprint']       = explode(',', $sprint);
+            $parsedParams['sprintStatus'] = explode(',', $sprintStatus);
+            $parsedParams['stage']        = $stage;
+            $parsedParams['begin']        = helper::safe64Decode($dateBegin);
+            $parsedParams['end']          = helper::safe64Decode($dateEnd);
+            $parsedParams['type']         = explode(',', $type);
+            return $parsedParams;
+        }
+
+        if($method === 'story' && $dimension === 'project')
+        {
+            list($program, $project, $projectStatus, $projectedType, $stage, $dateBegin, $dateEnd, $type) = $params;
+            $parsedParams = array();
+            $parsedParams['program']        = explode(',', $program);
+            $parsedParams['project']        = explode(',', $project);
+            $parsedParams['projectStatus']  = explode(',', $projectStatus);
+            $parsedParams['projectedType']  = explode(',', $projectedType);
+            $parsedParams['stage']          = $stage;
+            $parsedParams['begin']          = helper::safe64Decode($dateBegin);
+            $parsedParams['end']            = helper::safe64Decode($dateEnd);
+            $parsedParams['type']           = explode(',', $type);
+            return $parsedParams;
+        }
+
+        if($method === 'cycle' && $dimension === 'team')
+        {
+            list($team, $stageBegin, $stageEnd, $bugOpen, $bugBegin, $bugEnd, $dateBegin, $dateEnd, $type) = $params;
+            $parsedParams = array();
+            $parsedParams['team']       = explode(',', $team);
+            $parsedParams['stageBegin'] = $stageBegin;
+            $parsedParams['stageEnd']   = $stageEnd;
+            $parsedParams['bugOpen']    = explode(',', $bugOpen);
+            $parsedParams['bugBegin']   = $bugBegin;
+            $parsedParams['bugEnd']     = $bugEnd;
+            $parsedParams['begin']      = helper::safe64Decode($dateBegin);
+            $parsedParams['end']        = helper::safe64Decode($dateEnd);
+            $parsedParams['type']       = explode(',', $type);
+            return $parsedParams;
+        }
+
+        if($method === 'cycle' && $dimension === 'project')
+        {
+            list($program, $project, $projectStatus, $projectedType, $stageBegin, $stageEnd, $bugOpen, $bugBegin, $bugEnd, $dateBegin, $dateEnd) = $params;
+            $parsedParams = array();
+            $parsedParams['program']       = explode(',', $program);
+            $parsedParams['project']       = explode(',', $project);
+            $parsedParams['projectStatus'] = explode(',', $projectStatus);
+            $parsedParams['projectedType'] = explode(',', $projectedType);
+            $parsedParams['stageBegin']    = $stageBegin;
+            $parsedParams['stageEnd']      = $stageEnd;
+            $parsedParams['bugOpen']       = explode(',', $bugOpen);
+            $parsedParams['bugBegin']      = $bugBegin;
+            $parsedParams['bugEnd']        = $bugEnd;
+            $parsedParams['begin']         = helper::safe64Decode($dateBegin);
+            $parsedParams['end']           = helper::safe64Decode($dateEnd);
+            $parsedParams['type']          = explode(',', $type);
+            return $parsedParams;
+        }
+    }
+
+    public function getCustomStoryData($dimension, $params, $pager = null)
+    {
+        if($dimension === 'team')    list($teams, $relations) = $this->getExecutionsWithTeam($params, $pager);
+        if($dimension === 'sprint')  $relations = $this->getExecutionsWithSprint($params, $pager);
+        if($dimension === 'project') $relations = $this->getExecutionsWithProject($params, $pager);
+        $fieldList = array();
+        $fieldList[] = 't1.id as executionID';
+        $fieldList[] = 't1.name as execution';
+        $fieldList[] = 't1.begin as begin';
+        $fieldList[] = 't1.end as end';
+        $fieldList[] = 't1.realBegan as realBegan';
+        $fieldList[] = 't1.realEnd as realEnd';
+        $fieldList[] = 't1.status as status';
+        $executions = $this->dao->select(implode(',', $fieldList))
+            ->from(TABLE_PROJECT)->alias('t1')
+            ->where('t1.deleted')->eq(0)
+            ->andWhere('t1.id')->in(array_keys($relations))
+            ->fetchAll('executionID');
+
+        $executionIDs = array_keys($executions);
+
+        $this->app->loadLang('story');
+        $defaultCategory = array_filter(array_keys($this->lang->story->categoryList), function($value) {return $value !== 'manage' && $value !== 'affair';});
+        $category = isset($params['type'])  ? $params['type']  : $defaultCategory;
+        $stage    = isset($params['stage']) ? $params['stage'] : 'status_tested';
+        $begin    = isset($params['begin']) ? $params['begin'] : date('Y-m-d', strtotime('-2 weeks'));
+        $end      = isset($params['end'])   ? $params['end']   : date('Y-m-d', strtotime('today'));
+
+        $this->getCustomStoryDataWithDate($executions, $category, $stage, $begin, $end);
+        $this->getCustomStoryDataWithoutDate($executions, $category);
+        if($dimension !== 'project')
+        {
+            $this->setWorkingDays($executions, $dimension, $begin, $end, $relations);
+            $this->getCustomParticipants($executions);
+        }
+
+        if($dimension === 'team')    $result = $this->groupCustomStoryDataByTeam($executions, $teams, $relations);
+        if($dimension === 'sprint')  $result = $this->groupCustomStoryDataBySprint($executions, $relations);
+        if($dimension === 'project') $result = $this->groupCustomStoryDataByProject($executions, $relations);
+
+        return $result;
+    }
+
+    public function getCustomCycleData($dimension, $params, $pager = null)
+    {
+        if($dimension === 'team')    list($teams, $relations) = $this->getExecutionsWithTeam($params, $pager);
+        if($dimension === 'project') $relations = $this->getExecutionsWithProject($params, $pager);
+
+        $this->app->loadLang('story');
+        $defaultCategory = array_filter(array_keys($this->lang->story->categoryList), function($value) {return $value !== 'manage' && $value !== 'affair';});
+        $stageBegin = isset($params['stageBegin']) ? $params['stageBegin'] : 'status_tested';
+        $stageEnd   = isset($params['stageEnd'])   ? $params['stageEnd']   : 'status_tested';
+        $bugOpen    = isset($params['bugOpen'])    ? $params['bugOpen']    : array();
+        $bugBegin   = isset($params['bugBegin'])   ? $params['bugBegin']   : 'active';
+        $bugEnd     = isset($params['bugEnd'])     ? $params['bugEnd']     : 'closed';
+
+        $begin    = isset($params['begin']) ? $params['begin'] : date('Y-m-d', strtotime('-2 weeks'));
+        $end      = isset($params['end'])   ? $params['end']   : date('Y-m-d', strtotime('today'));
+        $category = isset($params['type'])  ? $params['type']  : $defaultCategory;
+
+        $executionIDs = array_keys($relations);
+        $storys = $this->getCustomStoryList($executionIDs, $stageEnd, $begin, $end);
+        $storys = $this->getCustomStoryStage($storys, $stageBegin, $stageEnd);
+        $bugs   = $this->getCustomBugList($executionIDs, $bugOpen, $bugEnd, $begin, $end);
+        $bugs   = $this->getCustomBugStage($bugs, $bugBegin, $bugEnd);
+        foreach($relations as $relation)
+        {
+            $relation->storyCount = 0;
+            $relation->storyCycle = 0;
+            $relation->bugCount = 0;
+            $relation->bugCycle = 0;
+            $relation->storys   = array();
+            $relation->bugs     = array();
+        }
+
+        foreach($storys as $story)
+        {
+            if(!in_array($story->category, $category)) continue;
+            $executionID = $story->executionID;
+            $relations[$executionID]->storyCount++;
+            $relations[$executionID]->storyCycle += $story->storyCycle;
+            $relations[$executionID]->storys[] = $story;
+        }
+
+        foreach($bugs as $bug)
+        {
+            $executionID = $bug->executionID;
+            $relations[$executionID]->bugCount++;
+            $relations[$executionID]->bugCycle += $bug->bugCycle;
+            $relations[$executionID]->bugs[] = $bug;
+        }
+
+        if($dimension === 'team')    $result = $this->groupCustomCycleDataByTeam($relations, $teams);
+        if($dimension === 'project') $result = $this->groupCustomCycleDataByProject($relations);
+
+        $result = $this->buildDrilldownParams($result);
+
+        return $result;
+    }
+
+    public function getCommonExecutionSQL()
+    {
+        return $this->dao->select('t1.id as teamID, t1.name as team, t4.id as executionID, t4.name as executionName, t4.status as executionStatus')
+            ->from(TABLE_CHTEAM)->alias('t1')
+            ->leftJoin(TABLE_CHPROJECTTEAM)->alias('t2')->on('t1.id = t2.team')
+            ->leftJoin(TABLE_CHPROJECTINTANCES)->alias('t3')->on('t2.project = t3.ch')
+            ->leftJoin(TABLE_PROJECT)->alias('t4')->on('t4.id = t3.zentao')
+            ->where('t1.deleted')->eq(0)
+            ->andWhere('t4.deleted')->eq(0)
+            ->andWhere('t4.type')->in('sprint,stage,kanban');
+    }
+
+    public function getCustomBugExecutionsWithTeam($teamIDList = array())
+    {
+        $teams = $this->dao->select('id,name as team')->from(TABLE_CHTEAM)
+            ->where('deleted')->eq('0')
+            ->beginIF(!empty($teamIDList))->andWhere('id')->in($teamIDList)->fi()
+            ->fetchAll('id');
+
+        $executions = $this->getCommonExecutionSQL()
+            ->andWhere('t1.id')->in(array_keys($teams))->fi()
+            ->orderBy('t4.id desc')
+            ->fetchAll('executionID');
+
+        return array($teams, $executions);
+    }
+
+    public function getAllCHExecutionCommonSQL()
+    {
+        $projects = $this->loadModel('chproject')->getObtainPermissionIntances();
+
+        return $this->dao->select('t1.*, t3.name as team')->from(TABLE_CHPROJECT)->alias('t1')
+            ->leftJoin(TABLE_CHPROJECTTEAM)->alias('t2')->on('t1.id = t2.project')
+            ->leftJoin(TABLE_CHTEAM)->alias('t3')->on('t3.id = t2.team')
+            ->where('t1.type')->in('sprint,stage,kanban')
+            ->andWhere('t1.deleted')->eq('0')
+            ->andWhere('t1.vision')->eq($this->config->vision)
+            ->andWhere('t1.multiple')->eq('1')
+            ->andWhere('t1.grade')->eq('1')
+            ->beginIF(!$this->app->user->admin)->andWhere('t1.id')->in($projects)->fi();
+    }
+
+    public function getCustomBugExecutionsWithExecution($teamIDList = array(), $executionIDList = array(), $executionStatusList = array())
+    {
+        $this->loadModel('chproject');
+        $executions = $this->getAllCHExecutionCommonSQL()
+            ->beginIF(!empty($teamIDList))->andWhere('t2.team')->in($teamIDList)->fi()
+            ->beginIF(!empty($executionIDList))->andWhere('t1.id')->in($executionIDList)->fi()
+            ->fetchAll('id');
+
+        foreach($executions as $index => $execution)
+        {
+            $execution->intances = $this->chproject->getIntances($execution->id);
+            $execution->progress = $this->chproject->getProgress($execution);
+            $execution->status   = $this->chproject->getIntanceStatus($execution->intances);
+
+            if(!empty($executionStatusList) and !in_array($execution->status, $executionStatusList)) unset($executions[$index]);
+        }
+
+        return $executions;
+    }
+
+    public function getCustomBugExecutionsWithProject($programIDList = array(), $projectIDList = array(), $projectStatusList = array(), $proposalType = array())
+    {
+        $executions = $this->dao->select('t2.id as executionID, t2.name as executionName, t3.id as projectID, t3.name as projectName, t3.status as projectStatus')->from(TABLE_CHPROJECTINTANCES)->alias('t1')
+            ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t2.id = t1.zentao') //execution
+            ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t3.id = t2.project') //project
+            ->leftJoin(TABLE_PROJECT)->alias('t4')->on('t4.id = t3.parent') //program
+            ->where('t2.deleted')->eq(0)
+            ->andWhere('t3.deleted')->eq(0)
+            ->andWhere('t4.deleted')->eq(0)
+            ->andWhere('t2.type')->in('sprint,stage,kanban')
+            ->andWhere('t3.type')->eq('project')
+            ->andWhere('t4.type')->eq('program')
+            ->beginIF(!empty($programIDList))->andWhere('t4.id')->in($programIDList)->fi()
+            ->beginIF(!empty($projectIDList))->andWhere('t3.id')->in($projectIDList)->fi()
+            ->beginIF(!empty($proposalType))->andWhere('t3.proposalType')->in($proposalType)->fi()
+            ->beginIF(!empty($projectStatusList))->andWhere('t3.status')->in($projectStatusList)->fi()
+            ->orderBy('t4.id desc')
+            ->fetchAll('executionID');
+
+        return $executions;
+    }
+
+    public function getCustomBugData($dimension, $params, $pager = null)
+    {
+        if($dimension == 'team')
+        {
+            $teamIDList  = $params['team'];
+            $bugTypeList = $params['bugType'];
+            $begin       = $params['date']['begin'];
+            $end         = $params['date']['end'];
+
+            list($teams, $executions) = $this->getCustomBugExecutionsWithTeam($teamIDList, $pager);
+            $this->setCustomTeamBugExecutiuon($executions, $bugTypeList, $begin, $end);
+
+            $teamPairs  = array();
+            foreach($teams as $teamID => $team) $teamPairs[$teamID] = array();
+            foreach($executions as $executionID => $execution) $teamPairs[$execution->teamID][$executionID] = $execution;
+
+            foreach($teamPairs as $teamID => $teamExecutions)
+            {
+                $teams[$teamID]->newTestBug         = array_sum(array_column($teamExecutions, 'newTestBug'));
+                $teams[$teamID]->newEffTestBug      = array_sum(array_column($teamExecutions, 'newEffTestBug'));
+                $teams[$teamID]->newOnlineBug       = array_sum(array_column($teamExecutions, 'newOnlineBug'));
+                $teams[$teamID]->newEffBug          = array_sum(array_column($teamExecutions, 'newEffBug'));
+                $teams[$teamID]->newEffTestCloseBug = array_sum(array_column($teamExecutions, 'newEffTestCloseBug'));
+                $teams[$teamID]->newEffCloseBug     = array_sum(array_column($teamExecutions, 'newEffCloseBug'));
+                $teams[$teamID]->effCloseBug        = array_sum(array_column($teamExecutions, 'effCloseBug'));
+
+                $teams[$teamID]->newEffCloseBugRate = $teams[$teamID]->newEffBug ? round($teams[$teamID]->newEffCloseBug * 100 / $teams[$teamID]->newEffBug, 2) : 0;
+            }
+
+            return $teams;
+        }
+        elseif($dimension == 'sprint')
+        {
+            $teamIDList          = $params['team'];
+            $executionIDList     = $params['executionName'];
+            $executionStatusList = $params['executionStatus'];
+            $bugTypeList         = $params['bugType'];
+
+            $executions = $this->getCustomBugExecutionsWithExecution($teamIDList, $executionIDList, $executionStatusList, $pager);
+            $executionDates = $this->dao->select('id,status,realBegan,realEnd,suspendedDate')->from(TABLE_PROJECT)->where('deleted')->eq(0)->andWhere('type')->in('sprint,kanban,stage')->fetchAll('id');
+            /* 分页 */
+            list($executions, $recTotal, $pageTotal) = $this->pageObject($executions, $pager->recPerPage, $pager->pageID);
+            $pager->recTotal  = $recTotal;
+            $pager->pageTotal = $pageTotal;
+
+            foreach($executions as $index => $execution)
+            {
+                $status = $execution->status;
+                if($status == 'wait')
+                {
+                    $execution->newTestBug         = 0;
+                    $execution->newEffTestBug      = 0;
+                    $execution->newOnlineBug       = 0;
+                    $execution->newEffBug          = 0;
+                    $execution->newEffTestCloseBug = 0;
+                    $execution->newEffCloseBug     = 0;
+                    $execution->effCloseBug        = 0;
+                    $execution->newEffCloseBugRate = 0;
+                }
+                else
+                {
+                    $begin = '';
+                    $end   = '';
+                    if($status == 'doing') $end = helper::now();
+                    $childExecutionIDList = $execution->intances;
+                    foreach($childExecutionIDList as $childExecutionID)
+                    {
+                        $executionDate = $executionDates[$childExecutionID];
+                        if(empty($begin) and helper::isZeroDate($executionDate->realBegan)) $begin = $executionDate->realBegan;
+                        if($begin < $executionDate->realBegan) $begin = $executionDate->realBegan;
+
+                        if($status != 'doing')
+                        {
+                            if($status == 'suspended') $endKey = 'suspendedDate';
+                            if($status == 'closed') $endKey = 'realEnd';
+                            if(empty($end) and helper::isZeroDate($executionDate->$endKey)) $end = $executionDate->$endKey;
+                            if($end < $executionDate->$endKey) $end = $executionDate->$endKey;
+                        }
+                    }
+
+                    $begin .= ' 00:00:00';
+                    if($status != 'doing') $end .= ' 23:59:59';
+
+                    $executionInfo = $this->setCustomExecutionBugExecution($childExecutionIDList, $bugTypeList, $begin, $end);
+                    foreach($executionInfo as $key => $value) $execution->$key = $value;
+                }
+
+                $executions[$index] = $execution;
+            }
+            return $executions;
+        }
+        elseif($dimension == 'project')
+        {
+            $programIDList     = $params['program'];
+            $projectIDList     = $params['project'];
+            $projectStatusList = $params['projectStatus'];
+            $proposalType      = $params['proposalType'];
+            $bugTypeList       = $params['bugType'];
+            $begin             = $params['date']['begin'];
+            $end               = $params['date']['end'];
+
+            $executions = $this->getCustomBugExecutionsWithProject($programIDList, $projectIDList, $projectStatusList, $proposalType);
+            $this->setCustomProjectBugExecutiuon($executions, $bugTypeList, $begin, $end);
+            $mergeProjects = array();
+
+            foreach($executions as $execution)
+            {
+                $projectID = $execution->projectID;
+                if(!isset($mergeProjects[$projectID]))
+                {
+                    $mergeProjects[$projectID] = $execution;
+                }
+                else
+                {
+                    foreach($execution as $key => $value)
+                    {
+                        if(in_array($key, array('executionID', 'executionName', 'projectID', 'projectName', 'projectStatus'))) continue;
+                        $mergeProjects[$projectID]->$key += $value;
+                    }
+                }
+            }
+
+            list($mergeProjects, $recTotal, $pageTotal) = $this->pageObject($mergeProjects, $pager->recPerPage, $pager->pageID);
+            $pager->recTotal  = $recTotal;
+            $pager->pageTotal = $pageTotal;
+            return $mergeProjects;
+        }
+    }
+
+    public function pageObject($objects, $recPerPage, $pageID)
+    {
+        $recTotal   = count($objects); // 总条数
+        $pageTotal  = ceil($recTotal / $recPerPage); // 总页数
+        $offset     = ($pageID - 1) * $recPerPage; // 起始位置
+
+        $objects = array_slice($objects, $offset, $recPerPage, true);
+
+        return array($objects, $recTotal, $pageTotal);
+    }
+
+    public function getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+    {
+        return $this->dao->select('execution, count(1) as count')->from(TABLE_BUG)
+            ->where('deleted')->eq('0')
+            ->andWhere('execution')->in($executionIDList)
+            ->beginIF(!empty($bugTypeList))->andWhere('`type`')->in($bugTypeList)->fi();
+    }
+
+    public function setCustomProjectBugExecutiuon($executions, $bugTypeList, $begin, $end)
+    {
+        return $this->setCustomTeamBugExecutiuon($executions, $bugTypeList, $begin, $end);
+    }
+
+    public function setCustomTeamBugExecutiuon($executions, $bugTypeList, $begin, $end)
+    {
+        $executionIDList = array_keys($executions);
+
+        // 新增测试缺陷
+        $newTestBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere('defectedinversion')->ne('4')
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 新增有效测试缺陷
+        $newEffTestBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere('defectedinversion')->ne('4')
+            ->andWhere(" (resolution = '' OR resolution = 'fixed' OR resolution = 'postponed') ")
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 新增线上缺陷
+        $newOnlineBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere('defectedinversion')->eq('4')
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 新增有效缺陷
+        $newEffBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere(" (resolution = '' OR resolution = 'fixed' OR resolution = 'postponed') ")
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 新增有效测试缺陷关闭数
+        $newEffTestCloseBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere('closedDate')->ge($begin)
+            ->andWhere('closedDate')->le($end)
+            ->andWhere('defectedinversion')->ne('4')
+            ->andWhere(" (resolution = '' OR resolution = 'fixed' OR resolution = 'postponed') ")
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 新增有效缺陷关闭数
+        $newEffCloseBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($end)
+            ->andWhere('closedDate')->ge($begin)
+            ->andWhere('closedDate')->le($end)
+            ->andWhere(" (resolution = '' OR resolution = 'fixed' OR resolution = 'postponed') ")
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        // 有效缺陷关闭数
+        $effCloseBugs = $this->getCustomTeamBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere('closedDate')->ge($begin)
+            ->andWhere('closedDate')->le($end)
+            ->andWhere(" (resolution = '' OR resolution = 'fixed' OR resolution = 'postponed') ")
+            ->groupBy('execution')
+            ->fetchPairs('execution', 'count');
+
+        foreach($executions as $executionID => $execution)
+        {
+            $executions[$executionID]->newTestBug         = isset($newTestBugs[$executionID])         ? $newTestBugs[$executionID] : 0;
+            $executions[$executionID]->newEffTestBug      = isset($newEffTestBugs[$executionID])      ? $newEffTestBugs[$executionID] : 0;
+            $executions[$executionID]->newOnlineBug       = isset($newOnlineBugs[$executionID])       ? $newOnlineBugs[$executionID] : 0;
+            $executions[$executionID]->newEffBug          = isset($newEffBugs[$executionID])          ? $newEffBugs[$executionID] : 0;
+            $executions[$executionID]->newEffTestCloseBug = isset($newEffTestCloseBugs[$executionID]) ? $newEffTestCloseBugs[$executionID] : 0;
+            $executions[$executionID]->newEffCloseBug     = isset($newEffCloseBugs[$executionID])     ? $newEffCloseBugs[$executionID] : 0;
+            $executions[$executionID]->effCloseBug        = isset($effCloseBugs[$executionID])        ? $effCloseBugs[$executionID] : 0;
+        }
+
+        return $executions;
+    }
+
+    public function getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+    {
+        return $this->dao->select('count(1) as count')->from(TABLE_BUG)->alias('t1')
+            ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t1.execution = t2.id')
+            ->where('t1.deleted')->eq('0')
+            ->andWhere('t2.deleted')->eq('0')
+            ->andWhere('t1.execution')->in($executionIDList)
+            ->beginIF(!empty($bugTypeList))->andWhere('t1.`type`')->in($bugTypeList)->fi();
+    }
+
+    public function setCustomExecutionBugExecution($executionIDList, $bugTypeList, $begin, $end)
+    {
+        // 新增测试缺陷
+        $newTestBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere('t1.defectedinversion')->ne('4')
+            ->fetch('count');
+
+        // 新增有效测试缺陷
+        $newEffTestBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere('t1.defectedinversion')->ne('4')
+            ->andWhere(" (t1.resolution = '' OR t1.resolution = 'fixed' OR t1.resolution = 'postponed') ")
+            ->fetch('count');
+
+        // 新增线上缺陷
+        $newOnlineBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere('t1.defectedinversion')->eq('4')
+            ->fetch('count');
+
+        // 新增有效缺陷
+        $newEffBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere(" (t1.resolution = '' OR t1.resolution = 'fixed' OR t1.resolution = 'postponed') ")
+            ->fetch('count');
+
+        // 新增有效测试缺陷关闭数
+        $newEffTestCloseBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere("t1.closedDate < '$end'")
+            ->andWhere('defectedinversion')->ne('4')
+            ->andWhere(" (t1.resolution = '' OR t1.resolution = 'fixed' OR t1.resolution = 'postponed') ")
+            ->fetch('count');
+
+        // 新增有效缺陷关闭数
+        $newEffCloseBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.openedDate > '$begin'")
+            ->andWhere("t1.closedDate < '$end'")
+            ->andWhere(" (t1.resolution = '' OR t1.resolution = 'fixed' OR t1.resolution = 'postponed') ")
+            ->fetch('count');
+
+        // 有效缺陷关闭数
+        $effCloseBugs = $this->getCustomExecutionBugCommonSQL($executionIDList, $bugTypeList)
+            ->andWhere("t1.closedDate > '$begin'")
+            ->andWhere("t1.closedDate < '$end'")
+            ->andWhere(" (t1.resolution = '' OR t1.resolution = 'fixed' OR t1.resolution = 'postponed') ")
+            ->fetch('count');
+
+        $executionInfo = array();
+        $executionInfo['newTestBug'] = $newTestBugs;
+        $executionInfo['newEffTestBug'] = $newEffTestBugs;
+        $executionInfo['newOnlineBug'] = $newOnlineBugs;
+        $executionInfo['newEffBug'] = $newEffBugs;
+        $executionInfo['newEffTestCloseBug'] = $newEffTestCloseBugs;
+        $executionInfo['newEffCloseBug'] = $newEffCloseBugs;
+        $executionInfo['effCloseBug'] = $effCloseBugs;
+        $executionInfo['newEffCloseBugRate'] = $executionInfo['newEffBug'] ? round($executionInfo['newEffCloseBug'] * 100 / $executionInfo['newEffBug'], 2) : 0;
+        return $executionInfo;
+    }
 }
 
 /**

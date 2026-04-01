@@ -17,9 +17,12 @@
   }
   ?>
   <tr <?php echo $attr;?>>
+    <?php if($field->field == 'productPlan'):?>
+      <?php include './productplan.html.php';?>
+    <?php else:?>
     <th class='w-80px'><?php echo $field->name;?></th>
     <td>
-      <?php 
+      <?php
       if($field->control == 'file')
       {
           $filesName = "{$field->field}files";
@@ -43,6 +46,7 @@
       }
       ?>
     </td>
+    <?php endif;?>
   </tr>
   <?php endforeach;?>
 </table>

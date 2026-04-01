@@ -64,7 +64,7 @@ foreach(explode(',', $config->story->create->requiredFields) as $field)
             <th><?php echo $hiddenProduct ? $lang->story->module : $lang->story->product;?></th>
             <td colspan="2" class="<?php if($hiddenProduct) echo 'hidden';?>">
               <div class='input-group'>
-              <?php echo html::select('product', $products, $productID, "onchange='loadProduct(this.value);' class='form-control chosen control-product' required");?>
+              <?php echo $this->app->tab == 'project' ? html::select('product', $products, $productID, "onchange='loadProduct(this.value);' class='form-control chosen control-product' required") : html::select('product', $products, $productID, "onchange='loadProduct(this.value);loadProductProjects(this.value);' class='form-control chosen control-product' required");?>
               <span class='input-group-addon fix-border fix-padding'></span>
               <?php if($branches and $type != 'story') echo html::select('branch', $branches, $branch, "onchange='loadBranch();' class='form-control chosen control-branch'");?>
               </div>
@@ -214,34 +214,37 @@ foreach(explode(',', $config->story->create->requiredFields) as $field)
             </td>
           </tr>
           <?php endif;?>
+          <?php if(($this->app->tab == 'project' or $this->app->tab == 'product')):?>
           <tr>
-            <th><?php echo $lang->story->reviewers;?></th>
-            <td colspan='2' id='reviewerBox'>
-              <div class="table-row">
-                <?php $required = $this->story->checkForceReview() ? 'required' : '';?>
-                <?php echo $this->story->checkForceReview() ? '' : html::hidden('needNotReview', 1);?>
-                <div class="table-col">
-                  <?php echo html::select('reviewer[]', $hiddenProduct ? $teamUsers : $reviewers, empty($needReview) ? $product->PO : '', "class='form-control picker-select' multiple $required");?>
+            <th><?php echo $lang->story->project;?></th>
+            <td colspan='2'>
+              <div class='input-group required' id='projectBox'>
+                <?php echo html::select('project', $projects, 0, "onchange='loadProjectBusinesses(this.value);' class='form-control chosen'");?>
+              </div>
+            </td>
+            <?php if($type == 'requirement'):?>
+            <td colspan="2">
+              <div class="input-group">
+                <div class="input-group">
+                  <div class="input-group-addon" style="min-width: 77px;"><?php echo $lang->story->business;?></div>  
+                  <div class="input-group" id="businessBox">
+                  <?php echo html::select('business', $businesses, 0, "class='form-control chosen'");?>
+                  </div>
                 </div>
               </div>
             </td>
+            <?php endif;?>
           </tr>
+          <?php endif;?>
           <?php if($type == 'story'):?>
           <?php if($this->config->URAndSR):?>
           <tr>
-            <th><?php echo $hiddenURS ? $lang->story->parent : $lang->story->requirement;?></th>
-            <td colspan="2" class="<?php if($hiddenURS) echo 'hidden';?>">
-              <div class='input-group'>
-                <div class='URSBox'><?php echo html::select('URS[]', $URS, '', "class='form-control picker-select' multiple");?></div>
-                <span class='input-group-btn'><?php echo html::commonButton($lang->story->loadAllStories, "class='btn btn-default' onclick='loadURS()' data-toggle='tooltip'");?></span>
-              </div>
-            </td>
             <?php if($app->tab == 'product'):?>
+            <?php if(!$hiddenURS):?>
+            <th><?php echo $lang->story->parent;?></th>
+            <?php endif;?>
             <td colspan="2" <?php if($hiddenParent) echo 'hidden';?>>
               <div class='input-group' id='moduleIdBox'>
-                <?php if(!$hiddenURS):?>
-                <div class="input-group-addon"><?php echo $lang->story->parent;?></div>
-                <?php endif;?>
                 <?php echo html::select('parent', $stories, '', "class='form-control chosen'");?>
               </div>
             </td>
@@ -329,12 +332,13 @@ foreach(explode(',', $config->story->create->requiredFields) as $field)
                 <div class="table-col <?php echo $hiddenEstimate?> estimateBox">
                   <div class="input-group">
                     <span class="input-group-addon fix-border br-0"><?php echo $lang->story->estimateAB;?></span>
-                    <input type="text" name="estimate" id="estimate" value="<?php echo $estimate;?>" class="form-control" autocomplete="off" placeholder='<?php echo $lang->story->hour;?>' />
+                    <input type="text" name="estimate" id="estimate" value="<?php echo $estimate;?>" class="form-control" autocomplete="off" placeholder='' />
                   </div>
                 </div>
               </div>
             </td>
           </tr>
+
           <tr>
             <th><?php echo $lang->story->spec;?></th>
             <td colspan="4">
@@ -385,7 +389,6 @@ foreach(explode(',', $config->story->create->requiredFields) as $field)
               <?php if(defined('TUTORIAL')):?>
               <?php echo html::submitButton();?>
               <?php else:?>
-              <?php echo html::commonButton($lang->save, "id='saveButton'", 'btn btn-primary btn-wide');?>
               <?php echo html::commonButton($lang->story->saveDraft, "id='saveDraftButton'", 'btn btn-secondary btn-wide');?>
               <?php endif;?>
               <?php echo $gobackLink ? html::a($gobackLink, $lang->goback, '', 'class="btn btn-wide"') : html::backButton('', $source == 'bug' ? 'data-app=qa' : '');?>
@@ -447,6 +450,23 @@ $(function()
         var url = createLink('story', 'create', "productID=0&branch=0&moduleID=0&story=0&execution=" + executionID + "&bugID=0&planID=0&todoID=0&extra=" + executionID + "&storyType=" + storyType + "&chproject=" + chproject);
         location.href = url;
     });
+    $('input[name="estimate"]').on('input', function()
+    {
+      var value = $(this).val().replace(/[^0-9.]/g, '');
+      var parts = value.split('.');
+
+      if (parts.length > 2)
+      {
+          value = parts[0] + '.' + parts.slice(1).join('');
+      }
+
+      if (parts[1] && parts[1].length > 2)
+      {
+          value = `${parts[0]}.${parts[1].slice(0, 2)}`;
+      }
+
+      $(this).val(value)
+    })
 });
 
 setTimeout(() => {
@@ -456,6 +476,48 @@ setTimeout(() => {
   $("#modules0").parent().parent().css('flex', '1 0 160px')
 }, 600);
 
+function loadProductProjects(productID)
+{
+    branch   = $('#branch').val();
+    if(typeof(branch) == 'undefined') branch = 0;
+    link = createLink('story', 'ajaxGetProductProjects', 'productID=' + productID + '&branch=' + branch);
+    $('#projectBox').load(link, function()
+    {
+        $(this).find('select').chosen();
+    });
+    loadProjectBusinesses(0)
+}
+var projectID = $('#project').find("option:selected").val();
+loadProjectBusinesses(projectID)
+function loadProjectBusinesses(projectID)
+{
+    isApproval = true;
+    if(projectID)
+    {
+      link = createLink('story', 'ajaxGetProject', 'projectID=' + projectID);
+      $.ajax({
+          url: link,
+          type: 'GET',
+          async: false,
+          dataType: 'json',
+          success: function(data) {
+             isApproval = data.instance;
+          },
+      });
+    }
+
+    if(isApproval == 0)
+    {
+      $('#businessBox').closest('td').css('display', 'none');
+      return;
+    }
+    $('#businessBox').closest('td').css('display', 'table-cell');
+    link = createLink('story', 'ajaxGetProjectBusinesses', 'projectID=' + projectID);
+    $('#businessBox').load(link, function()
+    {
+        $(this).find('select').chosen();
+    });
+}
 </script>
 <?php include $app->getModuleRoot() . 'ai/view/inputinject.html.php';?>
 <?php include $app->getModuleRoot() . 'common/view/footer.html.php';?>

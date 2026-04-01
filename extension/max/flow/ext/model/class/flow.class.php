@@ -150,7 +150,15 @@ class flowFlow extends flowModel
             if($field->buildin or !$field->show or !isset($layouts[$field->field])) continue;
 
             if((is_numeric($field->default) or $field->default) and empty($field->defaultValue)) $field->defaultValue = $field->default;
-            if(empty($object->{$field->field})) $object->{$field->field} = $field->defaultValue;
+
+            if($this->app->getModuleName() == 'yearplandemand')
+            {
+                if($object->{$field->field} === '') $object->{$field->field} = $field->defaultValue;
+            }
+            else
+            {
+                if(empty($object->{$field->field})) $object->{$field->field} = $field->defaultValue;
+            }
 
             $require = '';
             if($inForm && !$field->readonly && $notEmptyRule && strpos(",$field->rules,", ",{$notEmptyRule->id},") !== false) $require = "class='required'";
@@ -283,7 +291,7 @@ class flowFlow extends flowModel
         {
             list($prefix, $suffix) = $this->getCategoryButtons($extendField);
 
-            return $prefix . html::select($controlName . '[]', $extendField->options, $value, "class='form-control chosen' multiple $data $readonly") . $suffix;
+            return $prefix . html::select($controlName . '[]', $extendField->options, $value, "class='form-control picker-select' multiple $data $readonly") . $suffix;
         }
 
         if($extendField->control == 'checkbox') return html::checkbox($controlName, $extendField->options, $value, "class='form-control' $readonly");
@@ -782,6 +790,37 @@ EOT;
         $actions   = $this->workflowaction->getList($flow->module);
         foreach($actions as $action)
         {
+            /* Jump view button because of we show the link on title. */
+            if(in_array($action->module, array('business', 'projectapproval')) && $action->action == 'view') continue;
+            if($action->module == 'business' && ($action->action == 'projectchange' || $action->action == 'prdsubmit'|| $action->action == 'prdcancel')) continue;
+
+            $tempBusiness = $this->dao->select('*')->from('zt_flow_business')->where('id')->eq($data->id)->fetch();
+            if($action->module == 'business' && ($action->action == 'prdreview' || $action->action == 'close') && $tempBusiness->project)
+            {
+                $tempProjectapproval = $this->dao->select('*')->from('zt_flow_projectapproval')->where('id')->eq($tempBusiness->project)->fetch();
+                $tempProjectDept     = $this->loadModel('dept')->getAllChildId($tempProjectapproval->responsibleDept);
+                $infoLeqader         = $this->loadModel('user')->getUsersByUserGroupName($this->lang->flow->infoLeqader);
+                $infoAttache         = $this->loadModel('user')->getUsersByUserGroupName($this->lang->flow->infoAttache);
+
+                $isProjectLeader     = false;
+                $projectDepts        = $this->dao->select('*')->from('zt_dept')->where('id')->in($tempProjectDept)->fetchAll();
+                foreach($projectDepts as $dept) if(strpos($dept->leaders, $this->app->user->account) !== false) $isProjectLeader = true;
+
+                if($action->action == 'prdreview' && !$this->app->user->admin && !((in_array($this->app->user->dept, $tempProjectDept) || $isProjectLeader) && (isset($infoLeqader[$this->app->user->account]) || isset($infoAttache[$this->app->user->account])))) continue;
+
+                if($action->action == 'close')
+                {
+                    $isBusinessLeader = false;
+                    $tempBusinessDept = $this->loadModel('dept')->getAllChildId($data->createdDept);
+                    $businessDepts    = $this->dao->select('*')->from('zt_dept')->where('id')->in($tempBusinessDept)->fetchAll();
+                    foreach($businessDepts as $dept) if(strpos($dept->leaders, $this->app->user->account) !== false) $isBusinessLeader = true;
+
+                    $projectBusinessPM = $this->dao->select('account')->from('zt_flow_projectmembers')->where('parent')->eq($tempBusiness->project)->andWhere('projectRole')->eq('businessPM')->fetchPairs('account');
+
+                    if(!$this->app->user->admin && !$isProjectLeader && !($isBusinessLeader && (isset($infoLeqader[$this->app->user->account]) || isset($infoAttache[$this->app->user->account]))) && !(isset($projectBusinessPM[$this->app->user->account]) || $data->businessPM == $this->app->user->account)) continue;
+                }
+            }
+
             $flowMenu = $this->buildActionMenu($flow->module, $action, $data, $type, $relations);
 
             if($type == 'browse' && $action->show == 'dropdownlist')
@@ -842,6 +881,65 @@ EOT;
         if($type != 'menu' && $action->type == 'batch' && $action->virtual != '1') return '';
         if(strpos($action->position, $type) === false) return '';
 
+        //if($moduleName == 'business' && strpos($action->position, 'approvalreview') === false)
+        //{
+        //    $createdDept = false;
+        //    if($data->createdDept)
+        //    {
+        //        $dept = $this->dao->select('id')->from(TABLE_DEPT)
+        //            ->where('id')->eq($this->app->user->dept)
+        //            ->andWhere("FIND_IN_SET($data->createdDept, `path`)")
+        //            ->fetch('id');
+
+        //        if($dept) $createdDept = true;
+        //    }
+
+        //    $architect = $this->loadModel('user')->getUsersByUserGroupName($this->lang->flow->architect);
+
+        //    if(!($this->app->user->admin || $createdDept || in_array($this->app->user->account, array_keys($architect)))) return '';
+        //}
+
+        if($moduleName == 'projectapproval' && (($action->action == 'approvalsubmit3') || ($action->action == 'approvalcancel3')))
+        {
+            $responsibleDept = false;
+            if($data->responsibleDept)
+            {
+                $deptAccount = $this->dao->select('account')->from(TABLE_USER)
+                    ->where('account')->eq($this->app->user->account)
+                    ->andWhere('dept')->eq($data->responsibleDept)
+                    ->fetch('account');
+
+                if($deptAccount)
+                {
+                    $this->loadModel('user');
+                    $infoLeqader = $this->user->getUsersByUserGroupName($this->lang->flow->infoLeqader);
+                    $infoAttache = $this->user->getUsersByUserGroupName($this->lang->flow->infoAttache);
+
+                    if(in_array($this->app->user->account, array_keys($infoLeqader)) || in_array($this->app->user->account, array_keys($infoAttache))) $responsibleDept = true;
+                }
+            }
+
+            if(!($this->app->user->admin || $responsibleDept || $data->businessPM == $this->app->user->account)) return '';
+        }
+
+        if($moduleName == 'projectapproval' && (($action->action == 'approvalsubmit4') || ($action->action == 'approvalcancel4') || ($action->action == 'approvalsubmit5') || ($action->action == 'approvalcancel5')))
+        {
+            $currentUserDept = $this->loadModel('dept')->getByID($this->app->user->dept);
+            if(!($this->app->user->admin || strpos($currentUserDept->path, $data->responsibleDept) !== false || $data->businessPM == $this->app->user->account)) return '';
+        }
+
+        if($moduleName == 'projectapproval' && $action->action == 'approvalsubmit5')
+        {
+            $subBusinessIdList     = $this->dao->select('business')->from('zt_flow_projectbusiness')->where('parent')->eq($data->id)->andWhere('deleted')->eq(0)->fetchPairs('business');
+
+            $subBusinessStatusList = $this->dao->select('status')->from('zt_flow_business')->where('id')->in($subBusinessIdList)->fetchAll();
+            if(!$subBusinessStatusList) return '';
+            foreach($subBusinessStatusList as $subBusinessStatus)
+            {
+                if(!in_array($subBusinessStatus->status, array('cancelled', 'closed'))) return '';
+            }
+        }
+
         $methodName = $action->action;
 
         if(strpos($moduleName, '.') !== false) list($appName, $moduleName) = explode('.', $moduleName);
@@ -865,6 +963,8 @@ EOT;
 
         $enabled = true;
         if($type != 'menu' && ($action->extensionType != 'none' or !$action->buildin)) $enabled = $this->checkConditions($action->conditions, $data);
+
+        if(strpos($action->action, 'approvalsubmit') && $enabled) $enabled = $this->checkApprovalReview($action, $data);
 
         if($enabled)
         {
@@ -898,9 +998,11 @@ EOT;
                 $viewAction = $this->loadModel('workflowaction')->getByModuleAndAction($moduleName, 'view');
                 $class      = $action->open == 'modal' ? "iframe" : '';
                 $class     .= ($type == 'view' && $viewAction->open == 'modal') ? "loadInModal iframe" : '';
+                $dataWidth .= ($action->module == 'projectapproval' && $action->open == 'modal') ? "data-width='90%'" : '';
+                if($action->module == 'projectapproval' && $action->open == 'modal' && $action->action == 'uploadfiles') $dataWidth = str_replace("data-width='90%'", "data-width='50%'", $dataWidth);
                 $onlyBody   = ($type != 'menu' && $action->open == 'modal') ? true : false;
                 $deleter    = $action->method == 'delete' ? 'deleter' : '';
-                $link       = baseHTML::a(helper::createLink($module, $method, $params, '', $onlyBody), $label, "class='{$class} {$reload} {$btn} {$deleter}'");
+                $link       = baseHTML::a(helper::createLink($module, $method, $params, '', $onlyBody), $label, "class='{$class} {$reload} {$btn} {$deleter}' {$dataWidth}");
 
                 if($type == 'browse' && $action->show == 'dropdownlist') return "<li>" . $link . "</li>";
                 return $link;
@@ -908,10 +1010,58 @@ EOT;
         }
         else
         {
-            if($type == 'browse' and $action->show == 'direct') return baseHTML::a('javascript:;', $action->name, "class='disabled'");
+            if($type == 'browse' and $action->show == 'direct') return '';
         }
 
         return '';
+    }
+
+    public function checkApprovalReview($action, $data)
+    {
+        $this->app->loadModuleConfig('workflowaction');
+
+        $enabled   = true;
+        $actionKey = 0;
+        foreach($this->config->workflowaction->approval->actions as $approvalAction)
+        {
+            if(strpos($action->action, $approvalAction) !== false)
+            {
+                $actionKey = substr($action->action, strlen($approvalAction));
+                break;
+            }
+        }
+
+        $approvalFlowObjects = $this->dao->select('*')->from(TABLE_APPROVALFLOWOBJECT)->where('objectType')->eq($action->module)->fetchAll('id');
+        foreach($approvalFlowObjects as $approvalFlowObject)
+        {
+            $conditions = json_decode($approvalFlowObject->condition);
+            if($conditions->actionKey < $actionKey && $this->checkConditions(array($conditions), $data))
+            {
+                $enabled = false;
+                break;
+            }
+
+            if($conditions->actionKey == $actionKey && !$this->checkConditions(array($conditions), $data))
+            {
+                $enabled = false;
+                break;
+            }
+        }
+
+        return $enabled;
+    }
+
+    public function checkApprovalReviewMethod($action, $data)
+    {
+        // $flowID    = $this->dao->select('flow')->from(TABLE_APPROVAL)->where('objectType')->eq($data->type)->andWhere('objectID')->eq($data->id)->orderBy('id desc')->fetch('flow');
+        // $condition = $this->dao->select('`condition`')->from(TABLE_APPROVALFLOWOBJECT)->where('objectType')->eq($data->type)->andWhere('flow')->eq($flowID)->fetch('condition');
+        // $condition = json_decode($condition);
+
+        // return $condition->actionKey;
+
+        $action = $this->dao->select('action')->from(TABLE_ACTION)->where('objectType')->eq($data->type)->andWhere('objectID')->eq($data->id)->andWhere('action')->like('approvalsubmit%')->orderBy('id desc')->fetch('action');
+
+        return str_replace('approvalsubmit', '', $action);
     }
 
     /**
@@ -964,6 +1114,15 @@ EOT;
         if(!$orderBy) $orderBy = 'id_desc';
 
         $productRelatedModules = ",productplan,release,story,build,bug,testcase,testtask,testsuite,feedback,";
+
+        if($flow->module == 'projectapproval') $projectapprovalBrowseSql = $this->loadModel('flow')->getProjectapprovalBrowseSql();
+
+        if($flow->module == 'business')
+        {
+            $businessBrowseSql = $this->loadModel('flow')->getBusinessBrowseSql();
+            if(empty($businessBrowseSql)) return [];
+        }
+
         $dataList = $this->dao->select('*')->from($flow->table)
             ->where('deleted')->eq('0')
             ->beginIF(!$flow->buildin && $parentID)->andWhere('parent')->eq($parentID)->fi()
@@ -971,6 +1130,8 @@ EOT;
             ->beginIF($labelQuery)->andWhere($labelQuery)->fi()
             ->beginIF($categoryQuery)->andWhere($categoryQuery)->fi()
             ->beginIF($extraQuery)->andWhere($extraQuery)->fi()
+            ->beginIF($flow->module == 'projectapproval')->andWhere("($projectapprovalBrowseSql")->markRight(1)->fi()
+            ->beginIF($flow->module == 'business')->andWhere($businessBrowseSql)->fi()
             ->beginIF($flow->module == 'product')->andWhere('id')->in($this->app->user->view->products)->fi()
             ->beginIF($flow->module == 'project')->andWhere('id')->in($this->app->user->view->projects)->fi()
             ->beginIF($flow->module == 'execution')->andWhere('id')->in($this->app->user->view->sprints)->fi()
@@ -1014,6 +1175,9 @@ EOT;
             if($control == 'date' or $control == 'datetime' and isset($data->$field)) $data->$field = formatTime($data->$field);
             if($control == 'richtext') $editorFields[] = $field;
         }
+
+        if($this->app->moduleName == 'projectapproval' and $this->app->methodName == 'exportreportword') return $data;
+
         if($editorFields) $data = $this->file->replaceImgURL($data, $editorFields);
 
         return $data;

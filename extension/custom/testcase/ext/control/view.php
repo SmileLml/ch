@@ -11,7 +11,7 @@ class mytestcase extends testcase
      * @access public
      * @return void
      */
-    public function view($caseID, $version = 0, $from = 'testcase', $taskID = 0)
+    public function view($caseID, $version = 0, $from = 'testcase', $taskID = 0, $chProjectID = 0)
     {
         $this->session->set('bugList', $this->app->getURI(true), $this->app->tab);
 
@@ -48,7 +48,11 @@ class mytestcase extends testcase
         $isLibCase = ($case->lib and empty($case->product));
         if($isLibCase)
         {
-            $libraries = $this->loadModel('caselib')->getLibraries();
+            $this->loadModel('caselib');
+            $checkPriv = $this->caselib->checkPriv($case->lib);
+            if(!$checkPriv) return print(js::error($this->lang->caselib->noPriv) . js::locate($this->createLink('my', 'index'), 'parent'));
+
+            $libraries = $this->caselib->getLibraries();
             $this->app->tab == 'project' ? $this->loadModel('project')->setMenu($this->session->project) : $this->caselib->setLibMenu($libraries, $case->lib);
 
             $this->view->title      = "CASE #$case->id $case->title - " . $libraries[$case->lib];
@@ -65,11 +69,7 @@ class mytestcase extends testcase
             if($this->app->tab == 'project')   $this->loadModel('project')->setMenu($this->session->project);
             if($this->app->tab == 'execution') $this->loadModel('execution')->setMenu($this->session->execution);
             if($this->app->tab == 'qa')        $this->testcase->setMenu($this->products, $productID, $case->branch);
-            if($this->app->tab == 'chteam')
-            {
-                $chProjectID = $this->dao->select('ch')->from(TABLE_CHPROJECTINTANCES)->where('zentao')->eq($case->execution)->fetch('ch');
-                $this->loadModel('chproject')->setMenu($chProjectID);
-            }
+            if($this->app->tab == 'chteam' and $chProjectID) $this->loadModel('chproject')->setMenu($chProjectID);
 
             $this->view->title      = "CASE #$case->id $case->title - " . $product->name;
 
@@ -89,9 +89,11 @@ class mytestcase extends testcase
         $this->executeHooks($caseID);
         if($this->config->edition == 'ipd') $case = $this->loadModel('story')->getAffectObject('', 'case', $case);
 
-        if($this->app->tab == 'chteam')
+        if($this->app->tab == 'chteam' && $chProjectID)
         {
-            $execution = $this->loadModel('execution')->getByID($case->execution);
+            $intances       = $this->chproject->getIntances($chProjectID);
+            $linkExecutions = $this->chproject->getCaseExecution($case, $intances);
+            $execution      = $this->loadModel('execution')->getByID(reset($linkExecutions));
             $this->view->execution = $execution;
         }
 

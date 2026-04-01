@@ -11,6 +11,7 @@
   $canFlowchart   = $this->workflow->isClickable($flow, 'flowchart');
   $canBrowseField = $flow->buildin && commonModel::hasPriv('workflowfield', 'browse');
   $canPreview     = !$flow->buildin && $flow->status == 'normal' && commonModel::hasPriv("$flow->app.$flow->module", 'browse');
+  $canExport      = $this->workflow->isClickable($flow, 'export');
   ?>
   <div class='col-md-3 col-sm-4'>
     <div class='panel panel-block flow-block' id='flowBlock' data-flowapp='<?php echo $flow->app;?>'>
@@ -36,6 +37,7 @@
               <?php if($canEdit)   echo '<li>' . baseHTML::a(inlink('edit', "id=$flow->id"), $lang->edit, "data-toggle='modal'") . '</li>';?>
               <?php if($canCopy)   echo '<li>' . baseHTML::a(inlink('copy', "module=$flow->module"), $lang->workflow->copyFlow, "data-toggle='modal'") . '</li>';?>
               <?php if($canDelete) echo '<li>' . baseHTML::a(inlink('delete', "id=$flow->id"), $lang->delete, "class='deleter'") . '</li>';?>
+              <?php if($canExport) echo '<li>' . baseHTML::a(inlink('export', "id=$flow->id"), $lang->export, "class='exporter'") . '</li>';?>
             </ul>
           </li>
         </ul>

@@ -652,7 +652,7 @@ $(function()
     $('input[name^="onlyScene"]').click(function(){
         var onlyScene = $(this).is(':checked') ? 1 : 0;
         $.cookie('onlyScene', onlyScene, {expires:config.cookieLife, path:config.webRoot});
-        window.location.reload();
+        location.href = reloadUrl;
     });
 
     $("input[name^=caseIDList]").change(function(){

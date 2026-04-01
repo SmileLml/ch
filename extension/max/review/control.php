@@ -194,6 +194,30 @@ class review extends control
         if($_POST)
         {
             $reviewID = $this->review->create($projectID, $reviewRange, $checkedItem);
+            if(SX_ENABLE) 
+            {
+                $this->loadModel('apiRequest');
+                $review_url =  helper::createLink('my', 'audit', "&browseType=project&param=&orderBy=time_desc");
+                $project = $this->loadModel('project')->getByID($projectID);
+                $msgContent = sprintf("您有待审批的[项目]，请前往%s 进行确认。编号：%s ，主题： %s ，创建人：%s",$review_url,$project->code,$project->name,$_SESSION['user']->account);
+
+                $productID = $_POST['product'];
+                /* send openMessage */
+                if(is_array($_POST['reviewer']) && count($_POST['reviewer'])) 
+                {
+                    $reviewers = array_pop($_POST['reviewer']);
+                    foreach($reviewers as $value) {
+                        if(!empty($value)) 
+                        {
+                            try {
+                                $this->apiRequest->sendOpenMessage($value,$msgContent);
+                            } catch(Exception $e) {
+    
+                            }
+                        }
+                    }
+                }
+            }
 
             if(!dao::isError())
             {

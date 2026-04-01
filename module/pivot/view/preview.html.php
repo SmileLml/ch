@@ -11,6 +11,8 @@ $('#subNavbar li').not('[data-id=<?php echo $groupID;?>]').removeClass('active')
     <?php $active = ($key == $groupID) ? ' btn-active-text' : '';?>
     <?php echo html::a(inlink('preview', "dimension=$dimension&group=$key"), "<span class='text'>$label</span>", '', "class='btn btn-link {$active}'");?>
     <?php endforeach;?>
+    <?php $active = ('custom' === $groupID) ? ' btn-active-text' : '';?>
+    <?php echo html::a(inlink('preview', "dimension=$dimension&group=custom"), "<span class='text'>{$lang->pivot->customFeature}</span>", '', "class='btn btn-link {$active}'");?>
   </div>
   <?php if($this->config->edition != 'open'):?>
   <div class='btn-toolbar pull-right child-position'>
@@ -27,8 +29,9 @@ $('#subNavbar li').not('[data-id=<?php echo $groupID;?>]').removeClass('active')
 <?php include $pivotPath['common'] . 'exportdata.html.php';?>
 <?php endif;?>
 
+<?php if($groupID !== 'custom'):?>
 <div id='mainContent' class='main-row'>
-  <div class='side-col col-lg' id='sidebar'>
+    <div class='side-col col-lg' id='sidebar'>
     <div class="sidebar-toggle">
       <i class="icon icon-angle-left"></i>
     </div>
@@ -60,4 +63,40 @@ $('#subNavbar li').not('[data-id=<?php echo $groupID;?>]').removeClass('active')
     <?php endif;?>
   </div>
 </div>
+<?php else:?>
+<?php $method = empty($method) ? 'story' : $method;?>
+<div>
+  <div id='mainContent' class='main-row'>
+    <div class='side-col col-lg' id='sidebar'>
+    <div class="sidebar-toggle">
+      <i class="icon icon-angle-left"></i>
+    </div>
+    <div class="cell">
+      <div class='panel'>
+        <div class='panel-heading text-ellipsis'>
+        <div class='panel-title'><?php echo $lang->pivot->customFeature;?></div>
+        </div>
+        <div class='panel-body'>
+          <div class='list-group'>
+            <ul id="pivotGroups" class="tree" data-ride="tree" data-id="0">
+              <?php
+              foreach($lang->pivot->customList as $key => $label)
+              {
+                  $active = ($key == $method) ? ' active' : '';
+                  $link = inlink('preview', "dimension=$dimension&group=custom&module=pivot&method=$key&params=&customDimension=team");
+                  echo "<li class='pivot-{$key} {$active}' data-id='0_{$key}'><a href='{$link}' title='{$label}'>{$label}</a></li>";
+              }
+              ?>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class='main-col'>
+  <?php include "./$method.custom.html.php";?>
+  </div>
+</div>
+</div>
+<?php endif;?>
 <?php include '../../common/view/footer.html.php';?>

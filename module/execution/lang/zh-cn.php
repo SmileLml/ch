@@ -79,6 +79,7 @@ $lang->execution->release             = '发布';
 $lang->execution->acl                 = '访问控制';
 $lang->execution->auth                = '权限控制';
 $lang->execution->teamname            = '团队名称';
+$lang->execution->chteam              = '选择团队';
 $lang->execution->updateOrder         = '排序';
 $lang->execution->order               = $lang->executionCommon . '排序';
 $lang->execution->orderAB             = '排序';
@@ -334,6 +335,7 @@ $lang->execution->aboveAllExecution = "以上所有{$lang->executionCommon}";
 /* 页面提示。*/
 $lang->execution->linkStoryByPlanTips  = "此操作会将所选计划下面的{$lang->SRCommon}全部关联到此{$lang->executionCommon}中";
 $lang->execution->batchCreateStoryTips = "请选择需要批量新建研发需求的{$lang->productCommon}";
+$lang->execution->chteamTips           = "请选择团队";
 $lang->execution->selectExecution      = "请选择{$lang->execution->common}";
 $lang->execution->beginAndEnd          = '起止时间';
 $lang->execution->lblStats             = '工时统计';

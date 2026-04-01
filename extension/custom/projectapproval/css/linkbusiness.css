@@ -1,0 +1,7 @@
+.modal-dialog {
+    width: 1020px !important;
+}
+form-control[readonly] {
+    cursor: default;
+    background-color: #f5f5f5;
+}

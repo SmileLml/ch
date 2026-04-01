@@ -124,6 +124,22 @@ class myStory extends story
 
         if(!empty($_POST))
         {
+            if(!$_POST['project'] && $storyType == 'requirement') return $this->send(array('result' => 'fail', 'message' => $this->lang->story->projectRequire));
+            if($_POST['project'] && ($this->app->tab == 'project' or $this->app->tab == 'product'))
+            {
+                $objectID = $_POST['project'];
+                $project  = $this->loadModel('project')->getById($_POST['project']);
+                if(!$project->instance) $_POST['status'] = 'active';
+                unset($_POST['project']);
+            }
+            if($_POST['business'])
+            {
+                $business = $this->dao->select('*')->from('zt_flow_projectbusiness')->where('project')->eq($objectID)->andWhere('business')->eq($_POST['business'])->andWhere('deleted')->eq('0')->fetch();
+                if(!helper::isZeroDate($business->goLiveDate))
+                {
+                    if($_POST['planonlinedate'] && $_POST['planonlinedate'] > $business->goLiveDate) return $this->send(array('result' => 'fail', 'message' => $this->lang->story->planonlinedateover));
+                }
+            }
             $response['result'] = 'success';
 
             setcookie('lastStoryModule', (int)$this->post->module, $this->config->cookieLife, $this->config->webRoot, '', $this->config->cookieSecure, false);
@@ -136,6 +152,32 @@ class myStory extends story
                 return $this->send($response);
             }
 
+            $projectID         = $this->dao->select('project')->from('zt_projectstory')->where('story')->eq($storyResult['id'])->fetch('project');
+            $projectapprovalID = $this->dao->select('instance')->from('zt_project')->where('id')->eq($projectID)->fetch('instance');
+            $this->loadModel('flow');
+            if($projectapprovalID)
+            {
+                $projectapprovalStatus = $this->dao->select('status')->from('zt_flow_projectapproval')->where('id')->eq($projectapprovalID)->fetch('status');
+                if($projectapprovalStatus == 'approvedProject')
+                {
+                    $this->dao->update('zt_flow_projectapproval')->set('status')->eq('design')->where('id')->eq($projectapprovalID)->exec();
+
+                    $actionID = $this->loadModel('action')->create('projectapproval', $projectapprovalID, 'changedesign');
+                    $result['changes']   = array();
+                    $result['changes'][] = ['field' => 'status', 'old' => 'approvedProject', 'new' => 'design'];
+                    $this->loadModel('action')->logHistory($actionID, $result['changes']);
+
+                    $this->flow->mergeVersionByObjectType($projectapprovalID, 'projectapproval');
+                }
+            }
+
+            if($_POST['business'])
+            {
+                if(helper::isZeroDate($business->goLiveDate) || helper::isZeroDate($business->acceptanceDate))
+                {
+                    if(!empty($_POST['planonlinedate'])) $this->story->updateBusinessDate($projectapprovalID, $objectID, $$_POST['business'], $_POST['planonlinedate'], $business);
+                }
+            }
             $storyID   = $storyResult['id'];
             $productID = $this->post->product ? $this->post->product : $productID;
 
@@ -439,6 +481,20 @@ class myStory extends story
                 if($project->model === 'kanban') $this->view->hiddenURS  = true;
             }
         }
+        $projects   = array();
+        $businesses = array();
+        if($this->app->tab == 'project')
+        {
+            $projects   = array($this->session->project => $project->name);
+            $businesses = $this->project->getBusinessPairs($this->session->project, 'story');
+        }
+
+        if($this->app->tab == 'product')
+        {
+            $projects   = array('' => '');
+            $projects   += $this->product->getProjectPairsByProduct($productID, $branch);
+            $businesses = array();
+        }
 
         /* Get the module's children id list. */
         $moduleID     = $moduleID ? $moduleID : (int)$this->cookie->lastStoryModule;
@@ -488,6 +544,8 @@ class myStory extends story
         $this->view->feedbackBy       = !empty($feedbackBy) ? $feedbackBy : '';
         $this->view->notifyEmail      = !empty($notifyEmail) ? $notifyEmail : '';
         $this->view->showFeedbackBox  = in_array($source, $this->config->story->feedbackSource);
+        $this->view->businesses       = array(0=> '') + $businesses;
+        $this->view->projects         = $projects;
 
         $this->display();
     }

@@ -59,6 +59,10 @@ class mytask extends task
 
         if(!empty($_POST))
         {
+            $isBeyondEstimate = $this->task->isBeyondEstimate($_POST);
+
+            if(!$isBeyondEstimate) return $this->send(array('result' => 'fail', 'message' => $this->lang->task->beyondEstimateError));
+
             $mails = $this->task->batchCreate($executionID, $extra);
             if(dao::isError()) return print(js::error(dao::getError()));
 
@@ -106,11 +110,11 @@ class mytask extends task
         if($story)
         {
             $moduleID = $story->module;
-            $stories  = $this->story->getExecutionStoryPairs($executionID, 0, 'all', $moduleID, 'short', 'active');
+            $stories  = $this->story->getExecutionStoryPairs($executionID, 0, 'all', $moduleID, 'short', 'all');
         }
         else
         {
-            $stories = $this->story->getExecutionStoryPairs($executionID, 0, 'all', 0, 'short', 'active');
+            $stories = $this->story->getExecutionStoryPairs($executionID, 0, 'all', 0, 'short', 'all');
         }
 
         $members       = $this->loadModel('user')->getTeamMemberPairs($executionID, 'execution', 'nodeleted');

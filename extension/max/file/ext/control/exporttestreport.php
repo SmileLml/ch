@@ -98,6 +98,7 @@ class myfile extends file
         $this->addTh($this->lang->statusAB);
         $this->addTh($this->lang->story->stageAB);
         $this->wordContent .= '</w:tr>';
+
         foreach($this->post->stories as $story)
         {
             $this->wordContent .= '<w:tr w:rsidR="0000463B" w:rsidTr="0000463B">';
@@ -109,6 +110,19 @@ class myfile extends file
             $this->addTd($story->estimate);
             $this->addTd(zget($this->lang->story->statusList, $story->status));
             $this->addTd(zget($this->lang->story->stageList, $story->stage));
+            $this->wordContent .= '</w:tr>';
+        }
+        if(!$this->post->stories)
+        {
+            $this->wordContent .= '<w:tr w:rsidR="0000463B" w:rsidTr="0000463B">';
+            $this->addTd($this->lang->testreport->none);
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
             $this->wordContent .= '</w:tr>';
         }
         $this->wordContent .= '</w:tbl>';
@@ -137,6 +151,18 @@ class myfile extends file
             $this->addTd(zget($this->lang->bug->statusList, $bug->status));
             $this->wordContent .= '</w:tr>';
         }
+        if(!$this->post->bugs)
+        {
+            $this->wordContent .= '<w:tr w:rsidR="0000463B" w:rsidTr="0000463B">';
+            $this->addTd($this->lang->testreport->none);
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->wordContent .= '</w:tr>';
+        }
         $this->wordContent .= '</w:tbl>';
 
         $this->addTitle($this->lang->testreport->legendBuild, 2);
@@ -156,6 +182,15 @@ class myfile extends file
             $this->addTd(html::a($sysURL . $this->createLink('build', 'view', "id=$build->id"), $build->name));
             $this->addTd(zget($users, $build->builder));
             $this->addTd($build->date);
+            $this->wordContent .= '</w:tr>';
+        }
+        if(!$this->post->builds)
+        {
+            $this->wordContent .= '<w:tr w:rsidR="0000463B" w:rsidTr="0000463B">';
+            $this->addTd($this->lang->testreport->none);
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
             $this->wordContent .= '</w:tr>';
         }
         $this->wordContent .= '</w:tbl>';
@@ -219,44 +254,65 @@ class myfile extends file
             $this->addTd(zget($this->lang->bug->statusList, $bug->status));
             $this->wordContent .= '</w:tr>';
         }
+        if(!$this->post->legacyBugs)
+        {
+            $this->wordContent .= '<w:tr w:rsidR="0000463B" w:rsidTr="0000463B">';
+            $this->addTd($this->lang->testreport->none);
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->addTd('');
+            $this->wordContent .= '</w:tr>';
+        }
         $this->wordContent .= '</w:tbl>';
 
-        $this->addTitle($this->lang->testreport->legendReport, 2);
-        if($this->post->charts)
+        if(defined('RUN_MODE') && RUN_MODE != 'api')
         {
-            foreach($this->post->charts as $chart => $chartOption)
+            $this->addTitle($this->lang->testreport->legendReport, 2);
+            if($this->post->charts)
             {
-                $data      = $this->post->datas[$chart];
-                $title     = $this->lang->testtask->report->charts[$chart];
-                $chartName = 'chart-' . $chart;
-                $this->addTitle($title, 3);
-                if(isset($_POST[$chartName]))
+                foreach($this->post->charts as $chart => $chartOption)
                 {
-                    $this->addImage($this->post->$chartName);
-                    $this->addTable($data, $chart);
-                    $this->addTextBreak(2);
+                    $data      = $this->post->datas[$chart];
+                    $title     = $this->lang->testtask->report->charts[$chart];
+                    $chartName = 'chart-' . $chart;
+                    $this->addTitle($title, 3);
+                    if(isset($_POST[$chartName]))
+                    {
+                        $this->addImage($this->post->$chartName);
+                        $this->addTable($data, $chart);
+                        $this->addTextBreak(2);
+                    }
                 }
             }
         }
 
-        foreach($this->post->bugInfo as $infoKey => $infoValue)
+        if(defined('RUN_MODE') && RUN_MODE != 'api')
         {
-            $title     = $this->lang->testreport->$infoKey;
-            $chartName = 'chart-' . $infoKey;
-            $this->addTitle($title, 3);
-            if(isset($_POST[$chartName]))
+            foreach($this->post->bugInfo as $infoKey => $infoValue)
             {
-                $this->addImage($this->post->$chartName);
-                $this->addTable($infoValue, $infoKey);
-                $this->addTextBreak(2);
+                $title     = $this->lang->testreport->$infoKey;
+                $chartName = 'chart-' . $infoKey;
+                $this->addTitle($title, 3);
+                if(isset($_POST[$chartName]))
+                {
+                    $this->addImage($this->post->$chartName);
+                    $this->addTable($infoValue, $infoKey);
+                    $this->addTextBreak(2);
+                }
             }
         }
 
         $this->addTitle($this->lang->testreport->legendComment, 2);
         $this->pauseHtmlTag($this->post->report->report);
 
-        $this->addTitle($this->lang->files, 2);
-        if(empty($this->post->report->files)) $this->wordContent .= '<w:p><w:pPr><w:spacing w:line="220" w:lineRule="atLeast"/></w:pPr></w:p>';
+        if(defined('RUN_MODE') && RUN_MODE != 'api')
+        {
+            $this->addTitle($this->lang->files, 2);
+            if(empty($this->post->report->files)) $this->wordContent .= '<w:p><w:pPr><w:spacing w:line="220" w:lineRule="atLeast"/></w:pPr></w:p>';
+        }
         $this->formatDocxFiles($this->post->report);
 
         $defaultImage   = '';

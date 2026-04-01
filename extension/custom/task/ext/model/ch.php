@@ -1,5 +1,146 @@
 <?php
 /**
+ * is be online business
+ * @param object $task
+ * @return bool
+ */
+public function beOnlineBusiness($taskID)
+{
+    $task = $this->getById($taskID);
+    if(!$task->story) return false;
+
+    $requirementID = $this->dao->select('AID')->from(TABLE_RELATION)->where('BType')->eq('story')->andWhere('BID')->eq($task->story)->fetch('AID');
+    if(!$requirementID) return false;
+
+    $businessID = $this->dao->select('business')->from('zt_story')->where('id')->eq($requirementID)->fetch('business');
+    if(!$businessID) return false;
+
+    $businessStatus = $this->dao->select('status')->from('zt_flow_business')->where('id')->eq($businessID)->fetch('status');
+    if($businessStatus != 'PRDPassed') return false;
+
+    $requirements = $this->dao->select('id')->from('zt_story')->where('business')->eq($businessID)->fetchPairs('id', 'id');
+    $storyIdList  = $this->dao->select('BID')->from(TABLE_RELATION)->where('AType')->eq('requirement')->AndWhere('AID')->in($requirements)->fetchPairs('BID', 'BID');
+    $taskList     = $this->dao->select('status')->from('zt_task')->where('story')->in($storyIdList)->fetchAll();
+
+    if(count($taskList) != 0)
+    {
+        $isBeOnline = true;
+        foreach($taskList as $task)
+        {
+            if($task->status != 'closed') $isBeOnline = false;
+        }
+        if($isBeOnline)
+        {
+            $this->dao->update('zt_flow_business')->set('status')->eq('beOnline')->set('realGoLiveDate')->eq(helper::now())->where('id')->eq($businessID)->exec();
+
+            $this->loadModel('flow')->mergeVersionByObjectType($businessID, 'business');
+
+            $projectapprovalID     = $this->dao->select('parent')->from('zt_flow_projectbusiness')->where('business')->eq($businessID)->andWhere('deleted')->eq(0)->fetch('parent');
+            $businessIdList     = $this->dao->select('business')->from('zt_flow_projectbusiness')->where('parent')->eq($projectapprovalID)->andWhere('deleted')->eq(0)->fetchPairs('business', 'business');
+            $businessStatusList = $this->dao->select('status')->from('zt_flow_business')->where('id')->in($businessIdList)->fetchAll('status');
+
+            $isClosure = true;
+            foreach($businessStatusList as $businessStatus)
+            {
+                if($businessStatus->status != 'beOnline') $isClosure = false;
+            }
+
+            $projectapprovalStatus = $this->dao->select('status')->from('zt_flow_projectapproval')->where('id')->eq($projectapprovalID)->fetch('status');
+            $noChangeStatus        = array('cancelled', 'finished', 'cancelReview', 'finishReview', 'closure', 'changeReview');
+
+            if(!in_array($projectapprovalStatus, $noChangeStatus) && $isClosure && $projectapprovalStatus != 'closure')
+            {
+                $this->dao->update('zt_flow_projectapproval')->set('status')->eq('closure')->where('id')->eq($projectapprovalID)->exec();
+
+                $actionID = $this->loadModel('action')->create('projectapproval', $projectapprovalID, 'changeclosure');
+                $result['changes']   = array();
+                $result['changes'][] = ['field' => 'status', 'old' => $projectapprovalStatus, 'new' => 'closure'];
+                $this->loadModel('action')->logHistory($actionID, $result['changes']);
+
+                $this->loadModel('flow')->mergeVersionByObjectType($projectapprovalID, 'projectapproval');
+            }
+        }
+    }
+}
+
+/**
+ * Is beyond estimate.
+ * @param array  $data
+ * @param string $operate
+ */
+public function isBeyondEstimate($data, $operate = 'create')
+{
+    if($operate == 'edit')
+    {
+        $taskIDList  = $data['taskIDList'];
+        $storyIDList = $this->dao->select('id, story')->from('zt_task')->where('id')->in($taskIDList)->fetchPairs('id');
+    }
+    $storyIDList = $operate == 'create' ? $data['story'] : $storyIDList;
+    $newStoryIDList = array();
+    foreach($storyIDList as $key => $value)
+    {
+        if($value == 'ditto') $value = $preValue;
+        $preValue = $value;
+        $newStoryIDList[$value][] = $key;
+    }
+
+    foreach($newStoryIDList as $key => $value)
+    {
+        if($key)
+        {
+            $storyInfo           = $this->loadModel('story')->getById($key);
+            $linkedStoryEstimate = $this->dao->select('sum(estimate) as estimateSum')
+                ->from(TABLE_TASK)
+                ->where('story')->eq($key)
+                ->beginIF($operate == 'edit')->andWhere('id')->notin($value)->fi()
+                ->beginIF(isset($_POST['parent']))->andWhere('id')->notin(array_filter(array_unique(array_values($_POST['parent']))))->fi()
+                ->andWhere('deleted')->eq(0)
+                ->andWhere('parent')->ne('-1')
+                ->fetch('estimateSum');
+            $estimate     = 0;
+            $estimateList = $operate == 'create' ? $_POST['estimate'] : $_POST['estimates'];
+            foreach($value as $taskID)
+            {
+                $estimate += (int)$estimateList[$taskID];
+            }
+
+            if((int)$linkedStoryEstimate + $estimate > ($storyInfo->estimate * 8)) return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Batch change the module of task.
+ *
+ * @param  array  $taskIDList
+ * @param  int    $stroyID
+ * @access public
+ * @return array
+ */
+public function batchChangeStory($taskIDList, $storyID)
+{
+    $now        = helper::now();
+    $allChanges = array();
+    $oldTasks   = $this->getByList($taskIDList);
+
+    foreach($taskIDList as $taskID)
+    {
+        $oldTask = $oldTasks[$taskID];
+        if($storyID == $oldTask->story) continue;
+
+        $task = new stdclass();
+        $task->lastEditedBy   = $this->app->user->account;
+        $task->lastEditedDate = $now;
+        $task->story          = $storyID;
+
+        $this->dao->update(TABLE_TASK)->data($task)->autoCheck()->where('id')->eq((int)$taskID)->exec();
+        if(!dao::isError()) $allChanges[$taskID] = common::createChanges($oldTask, $task);
+    }
+    return $allChanges;
+}
+
+/**
  * Get tasks of a execution.
  *
  * @param int|array $executionID
@@ -175,4 +316,226 @@ public function buildOperateViewMenu($task)
     if($task->parent > 0) $menu .= $this->buildMenu('task', 'view', "taskID=$task->parent", $task, 'view', 'chevron-double-up', '', '', '', '', $this->lang->task->parent);
 
     return $menu;
+}
+
+/**
+ * Judge an action is clickable or not.
+ *
+ * @param  object    $task
+ * @param  string    $action
+ * @access public
+ * @return bool
+ */
+public static function isClickable($task, $action)
+{
+    global $app, $config;
+
+    $isNotCloseProject = true;
+    if(!empty($task->project))
+    {
+        $projectapprovalID = $app->dbQuery('SELECT instance FROM zt_project WHERE id = ' . $task->project)->fetch();
+        $projectapproval = $app->dbQuery('SELECT `status` FROM zt_flow_projectapproval WHERE id = ' . $projectapprovalID->instance)->fetch();
+        if($projectapproval->status == 'cancelled' || $projectapproval->status == 'finished') $isNotCloseProject = false;
+    }
+
+    $action = strtolower($action);
+
+    if($action == 'start'          and $task->parent < 0) return false;
+    if($action == 'finish'         and $task->parent < 0) return false;
+    if($action == 'pause'          and $task->parent < 0) return false;
+    if($action == 'assignto'       and $task->parent < 0) return false;
+    if($action == 'close'          and $task->parent < 0) return false;
+    if($action == 'batchcreate'    and !empty($task->team))     return false;
+    if($action == 'batchcreate'    and $task->parent > 0)       return false;
+    if($action == 'recordestimate' and $task->parent == -1)     return false;
+    if($action == 'delete'         and $task->parent < 0)       return false;
+
+    if(!empty($task->team))
+    {
+        global $app;
+        $myself = new self();
+        if($task->mode == 'linear')
+        {
+            if($action == 'assignto' and strpos('done,cencel,closed', $task->status) === false) return false;
+            if($action == 'start' and strpos('wait,doing', $task->status) !== false)
+            {
+                if($task->assignedTo != $app->user->account) return false;
+
+                $currentTeam = $myself->getTeamByAccount($task->team, $app->user->account);
+                if($currentTeam and $currentTeam->status == 'wait') return true;
+            }
+            if($action == 'finish' and $task->assignedTo != $app->user->account) return false;
+        }
+        elseif($task->mode == 'multi')
+        {
+            $currentTeam = $myself->getTeamByAccount($task->team, $app->user->account);
+            if($action == 'start' and strpos('wait,doing', $task->status) !== false and $currentTeam and $currentTeam->status == 'wait') return true;
+            if($action == 'finish' and (empty($currentTeam) or $currentTeam->status == 'done')) return false;
+        }
+    }
+
+    if($action == 'start')     return $task->status == 'wait';
+    if($action == 'restart')   return $task->status == 'pause';
+    if($action == 'pause')     return $task->status == 'doing';
+    if($action == 'assignto')  return $task->status != 'closed' and $task->status != 'cancel';
+    if($action == 'close')     return $task->status == 'done'   or  $task->status == 'cancel';
+    if($action == 'activate')  return $task->status == 'done'   or  $task->status == 'closed'  or $task->status  == 'cancel';
+    if($action == 'finish')    return $task->status != 'done'   and $task->status != 'closed'  and $task->status != 'cancel';
+    if($action == 'cancel')    return $task->status != 'done'   and $task->status != 'closed'  and $task->status != 'cancel';
+    if($action == 'edit')      return $isNotCloseProject;
+    if($action == 'batchedit') return $isNotCloseProject;
+    return true;
+}
+
+/**
+ * Check estimate by story.
+ *
+ * @param  array  $taskIDList
+ * @param  int    $storyID
+ * @param  int    $storyEstimate
+ * @access public
+ * @return mixed
+ */
+public function checkEstimateByStory($taskIDList, $storyID, $storyEstimate)
+{
+    $sumTaskEstimate = $this->dao->select('sum(estimate) as sumEstimate')->from('zt_task')
+        ->where('id')->in($taskIDList)
+        ->andWhere('deleted')->eq(0)
+        ->andWhere('parent')->ne('-1')
+        ->fetch('sumEstimate');
+
+    $taskEstimateSum = $this->dao->select('sum(estimate) as estimateSum')->from('zt_task')
+        ->where('story')->eq($storyID)
+        ->andWhere('id')->notin($taskIDList)
+        ->andWhere('deleted')->eq(0)
+        ->andWhere('parent')->ne('-1')
+        ->fetch('estimateSum');
+    if(((float)$sumTaskEstimate + (float)$taskEstimateSum) > ($storyEstimate * 8)) return true;
+
+    return false;
+}
+
+/**
+ * Batch change the execution and project of task.
+ *
+ * @access public
+ * @return array
+ */
+public function batchChangeExecution()
+{
+    $now     = helper::now();
+    $account = $this->app->user->account;
+
+    $data = fixer::input('post')
+        ->setDefault('lastEditedBy', $account)
+        ->setDefault('lastEditedDate', $now)
+        ->get();
+
+    $taskIdList = explode(',', $data->taskIdList);
+    unset($data->taskIdList);
+
+    $projectID   = $data->project;
+    $executionID = $data->execution;
+
+    $oldTask = $this->dao->select('execution, project')->from(TABLE_TASK)->where('id')->in($taskIdList)->limit(1)->fetch();
+    if($oldTask->execution == $executionID) return true;
+
+    $this->dao->update(TABLE_TASK)->data($data)->autoCheck()->batchcheck('execution, project', 'notempty')->where('id')->in($taskIdList)->exec();
+    if(dao::isError()) return false;
+
+    $this->loadModel('action');
+    foreach($taskIdList as $taskID)
+    {
+        $task = new stdclass();
+        $task->lastEditedBy   = $account;
+        $task->lastEditedDate = $now;
+        $task->execution      = $executionID;
+        $task->project        = $projectID;
+
+        $actionID = $this->action->create('task', $taskID, 'changeExecution');
+        $this->action->logHistory($actionID, common::createChanges($oldTask, $task));
+    }
+
+    $this->changeEffortExecution($taskIdList, $executionID, $projectID);
+
+    $oldProjectID   = $oldTask->project;
+    $oldExecutionID = $oldTask->execution;
+
+    $projectIdList = array($projectID => $projectID, $oldProjectID => $oldProjectID);
+    $this->loadModel('program')->refreshStats(true, $projectIdList);
+
+    $this->syncExecutionAndProjectStatus($executionID);
+
+    if($oldProjectID != $projectID) $this->changeOldObjectStatus($oldProjectID, 'project');
+    $this->changeOldObjectStatus($oldExecutionID, 'execution');
+
+    return true;
+}
+
+/**
+ * Change the execution of task.
+ *
+ * @param  array  $taskIDList
+ * @param  int    $executionID
+ * @param  int    $projectID
+ * @access public
+ * @return void
+ */
+public function changeEffortExecution($taskIDList, $executionID, $projectID)
+{
+    $this->dao->update(TABLE_EFFORT)
+        ->data(array('execution' => $executionID, 'project' => $projectID))
+        ->where('objectType')->eq('task')
+        ->andWhere('objectID')->in($taskIDList)
+        ->exec();
+
+    return true;
+}
+
+/**
+ * Sync the execution and project status.
+ *
+ * @param  int    $executionID
+ * @access public
+ * @return void
+ */
+public function syncExecutionAndProjectStatus($executionID)
+{
+    $this->loadModel('common');
+
+    $execution = $this->dao->select('id, project, grade, parent, status, deleted')->from(TABLE_EXECUTION)->where('id')->eq($executionID)->fetch();
+    if($execution->status == 'wait')
+    {
+        $this->dao->update(TABLE_EXECUTION)->set('status')->eq('doing')->set('realBegan')->eq($today)->where('id')->eq($execution->id)->exec();
+        $this->loadModel('project')->recordFirstEnd($execution->id); 
+        $this->loadModel('action')->create('execution', $execution->id, 'changedoingstatus');
+        if($execution->parent)
+        {
+            $execution = $this->dao->select('*')->from(TABLE_EXECUTION)->where('id')->eq($execution->id)->fetch(); // Get updated execution.
+            $this->common->syncExecutionByChild($execution);
+        }
+    }   
+
+    $project = $this->common->syncProjectStatus($execution);
+    $this->common->syncProgramStatus($project);
+
+    return true;
+}
+
+/**
+ * Sync the execution and project status.
+ *
+ * @param  int    $executionID
+ * @access public
+ * @return void
+ */
+public function changeOldObjectStatus($oldObjectID, $objectType)
+{
+    $object = $this->dao->select('consumed, status')->from(TABLE_PROJECT)->where('id')->eq($oldObjectID)->fetch();
+
+    if(empty($object->consumed) && $object->status == 'doing')
+    {
+        $this->dao->update(TABLE_PROJECT)->set('status')->eq('wait')->where('id')->eq($oldObjectID)->exec();
+        $this->loadModel('action')->create($objectType, $oldObjectID, 'changewaitstatus');
+    }
 }

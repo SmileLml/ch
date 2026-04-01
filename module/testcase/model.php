@@ -274,7 +274,7 @@ class testcaseModel extends model
 
         $showAutoCase = ($this->cookie->showAutoCase && !(defined('RUN_MODE') && RUN_MODE == 'api'));
 
-        return $stmt ->where('t1.product')->eq((int)$productID)
+        return $stmt->where('t1.product')->eq((int)$productID)
             ->beginIF($this->app->tab == 'project')->andWhere('t3.project')->eq($this->session->project)->fi()
             ->beginIF($branch !== 'all')->andWhere('t1.branch')->eq($branch)->fi()
             ->beginIF($moduleIdList)->andWhere('t1.module')->in($moduleIdList)->fi()
@@ -1200,7 +1200,7 @@ class testcaseModel extends model
             $case->lastEditedDate = $now;
             $case->pri            = $data->pris[$caseID];
             $case->module         = $data->modules[$caseID];
-            $case->scene          = $data->scene[$caseID];
+            $case->scene          = (int)$data->scene[$caseID];
             $case->status         = $data->statuses[$caseID];
             $case->story          = $data->story[$caseID];
             $case->color          = $data->color[$caseID];
@@ -3363,77 +3363,114 @@ class testcaseModel extends model
             ->fetchAll('id');
 
         $pager->recTotal = 0;
-
         if(!$scenes) return array();
 
-        $cases = array();
-        if($scenes && !$this->cookie->onlyScene)
-        {
-            $stmt = $this->dao->select('t1.*')->from(TABLE_CASE)->alias('t1');
-
-            if($this->app->tab == 'project') $stmt = $stmt->leftJoin(TABLE_PROJECTCASE)->alias('t2')->on('t1.id=t2.case');
-
-            $caseList = $stmt->where('t1.deleted')->eq('0')
-                ->andWhere('t1.scene')->ne(0)
-                ->andWhere('t1.product')->eq($productID)
-                ->beginIF($this->app->tab == 'project')->andWhere('t2.project')->eq($this->session->project)->fi()
-                ->beginIF($branch !== 'all')->andWhere('t1.branch')->eq($branch)->fi()
-                ->beginIF($modules)->andWhere('t1.module')->in($modules)->fi()
-                ->beginIF($this->cookie->showAutoCase)->andWhere('t1.auto')->eq('auto')->fi()
-                ->beginIF($caseType)->andWhere('t1.type')->eq($caseType)->fi()
-                ->orderBy($orderBy)
-                ->fetchAll('id');
-
-            $this->loadModel('common')->saveQueryCondition($this->dao->get(), 'testcase', false);
-            $caseList = $this->loadModel('story')->checkNeedConfirm($caseList);
-            $caseList = $this->appendData($caseList);
-            foreach($caseList as $case) $cases[$case->scene][$case->id] = $case;
-        }
+        $cases = $scenes && !$this->cookie->onlyScene ? $this->getSceneGroupCases($productID, $branch, $modules, $caseType, $orderBy) : array();
 
         $this->dao->setTable(TABLE_CASE);
         $fieldTypes = $this->dao->getFieldsType();
 
         foreach($scenes as $id => $scene)
         {
-            /* Set default value for the fields exist in TABLE_CASE but not in TABLE_SCENE. */
-            foreach($fieldTypes as $field => $type)
+            $scene = $this->buildSceneBaseOnCase($scene, $fieldTypes, zget($cases, $id, array()));
+            $scene->scene = $scene->parent;
+
+            if(isset($scenes[$scene->parent]))
             {
-                if(isset($scene->$field)) continue;
-                $scene->$field = $type['rule'] == 'int' ? '0' : '';
+                $parent = $scenes[$scene->parent];
+                $parent->children[$id] = $scene;
+                unset($scenes[$id]);
             }
-
-            $scene->bugs       = 0;
-            $scene->results    = 0;
-            $scene->caseFails  = 0;
-            $scene->stepNumber = 0;
-            $scene->isScene    = true;
-
-            if(isset($cases[$id]))
-            {
-                foreach($cases[$id] as $case)
-                {
-                    $case->id      = 'case_' . $case->id;
-                    $case->parent  = $id;
-                    $case->grade   = $scene->grade + 1;
-                    $case->path    = $scene->path . $case->id . ',';
-                    $case->isScene = false;
-
-                    $scene->cases[$case->id] = $case;
-                }
-            }
-
-            if(!isset($scenes[$scene->parent])) continue;
-
-            $parent = $scenes[$scene->parent];
-            $parent->children[$id] = $scene;
-
-            unset($scenes[$id]);
         }
 
         $pager->recTotal  = count($scenes);
         $pager->pageTotal = ceil($pager->recTotal / $pager->recPerPage);
 
-        return array_slice($scenes, $pager->recPerPage * ($pager->pageID - 1), $pager->recPerPage);
+        return array_slice($scenes, $pager->recPerPage * ($pager->pageID - 1), (int)$pager->recPerPage);
+    }
+
+    /**
+     * 获取用场景 ID 分组的用例。
+     * Get cases by scene id.
+     *
+     * @param  int    $productID
+     * @param  string $branch
+     * @param  array  $modules
+     * @param  string $caseType
+     * @param  string $orderBy
+     * @access public
+     * @return array
+     */
+    public function getSceneGroupCases($productID, $branch, $modules, $caseType, $orderBy)
+    {
+        $browseType = $this->session->caseBrowseType && $this->session->caseBrowseType != 'bysearch' ? $this->session->caseBrowseType : 'all';
+
+        $stmt = $this->dao->select('t1.*')->from(TABLE_CASE)->alias('t1');
+        if($this->app->tab == 'project') $stmt = $stmt->leftJoin(TABLE_PROJECTCASE)->alias('t2')->on('t1.id=t2.case');
+
+        $caseList = $stmt->where('t1.deleted')->eq('0')
+            ->andWhere('t1.scene')->ne(0)
+            ->andWhere('t1.product')->eq($productID)
+            ->beginIF($this->app->tab == 'project')->andWhere('t2.project')->eq($this->session->project)->fi()
+            ->beginIF($branch !== 'all')->andWhere('t1.branch')->eq($branch)->fi()
+            ->beginIF($modules)->andWhere('t1.module')->in($modules)->fi()
+            ->beginIF($browseType == 'wait')->andWhere('t1.status')->eq($browseType)->fi()
+            ->beginIF($this->cookie->onlyAutoCase)->andWhere('t1.auto')->eq('auto')->fi()
+            ->beginIF(!$this->cookie->onlyAutoCase)->andWhere('t1.auto')->ne('unit')->fi()
+            ->beginIF($caseType)->andWhere('t1.type')->eq($caseType)->fi()
+            ->orderBy($orderBy)
+            ->fetchAll('id');
+
+        $this->loadModel('common')->saveQueryCondition($this->dao->get(), 'testcase', false);
+        $caseList = $this->loadModel('story')->checkNeedConfirm($caseList);
+        $caseList = $this->appendData($caseList);
+
+        $cases = array();
+        foreach($caseList as $case) $cases[$case->scene][$case->id] = $case;
+
+        return $cases;
+    }
+
+    /**
+     * 基于用例构建场景数据。
+     * Build scene base on case.
+     *
+     * @param  object $scene
+     * @param  array  $fieldTypes
+     * @param  array  $cases
+     * @access public
+     * @return object
+     */
+    public function buildSceneBaseOnCase($scene, $fieldTypes, $cases)
+    {
+        /* Set default value for the fields exist in TABLE_CASE but not in TABLE_SCENE. */
+        foreach($fieldTypes as $field => $type)
+        {
+            if(!isset($scene->{$field})) $scene->{$field} = $type['rule'] == 'int' ? '0' : '';
+        }
+
+        $scene->caseID     = $scene->id;
+        $scene->bugs       = 0;
+        $scene->results    = 0;
+        $scene->caseFails  = 0;
+        $scene->stepNumber = 0;
+        $scene->isScene    = true;
+
+        if(!empty($cases))
+        {
+            foreach($cases as $case)
+            {
+                $case->caseID  = $case->id;
+                $case->id      = 'case_' . $case->id;
+                $case->parent  = $scene->id;
+                $case->grade   = $scene->grade + 1;
+                $case->path    = $scene->path . $case->id . ',';
+                $case->isScene = false;
+            }
+            $scene->cases = $cases;
+        }
+
+        return $scene;
     }
 
     /**

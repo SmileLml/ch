@@ -221,8 +221,12 @@
               <tr>
                 <th><?php echo $lang->story->status;?></th>
                 <td>
+                  <?php if($story->type == 'requirement' && $story->status == 'beOnline'):?>
+                  <?php echo html::select('status', $lang->story->beOnlineStatusList, $story->status, "class='form-control chosen'");?>
+                  <?php else:?>                  
                   <span class='story-<?php echo $story->status;?>'><?php echo $this->processStatus('story', $story);?></span>
                   <?php echo html::hidden('status', $story->status);?>
+                  <?php endif;?>
                 </td>
               </tr>
               <?php if($story->type == 'story'):?>

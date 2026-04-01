@@ -267,13 +267,8 @@ class releaseModel extends model
                         $release->stories .= ',' . $build->stories;
                         $this->loadModel('story')->updateStoryReleasedDate($build->stories, $release->date);
                     }
-                    if($build->bugs)    $release->bugs    .= ',' . $build->bugs;
+                    if($build->bugs) $release->bugs .= ',' . $build->bugs;
                 }
-            }
-            if($this->post->sync and $release->bugs)
-            {
-                $releaseBugs   = $this->loadModel('bug')->getReleaseBugs(array_keys($builds), $release->product, $release->branch);
-                $release->bugs = join(',', array_intersect(explode(',', $release->bugs), array_keys($releaseBugs)));
             }
 
             $release->build   = ',' . trim($release->build, ',') . ',';

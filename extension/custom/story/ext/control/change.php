@@ -17,6 +17,8 @@ class myStory extends story
         if(!empty($_POST))
         {
             $changes = $this->story->change($storyID);
+
+
             if(dao::isError())
             {
                 if(defined('RUN_MODE') && RUN_MODE == 'api') return $this->send(array('status' => 'fail', 'message' => dao::getError()));
@@ -96,6 +98,33 @@ class myStory extends story
                 $method = 'view';
                 $params = "storyID=$storyID&version=0&param=0&storyType=$storyType";
             }
+
+            /* send openMessage */
+            if(SX_ENABLE) 
+            {
+                $review_url = helper::createLink('my','audit','browseType=story&param=&orderBy=time_desc');
+                $story = $this->dao->findById((int)$storyID)->from(TABLE_STORY)->fetch();
+
+                $msgContent = sprintf($this->lang->story->openMessageTemplate,$review_url,$storyID,$story->title,$_SESSION['user']->account);
+                $this->loadModel('apiRequest');
+                if(is_array($_POST['reviewer'] && count($_POST['reviewer']))) 
+                {
+                    foreach($_POST['reviewer'] as $value) 
+                    {
+                        if(!empty($value))
+                        {
+                            try {
+                                $this->apiRequest->sendOpenMessage($value,$msgContent);
+                            } catch(Exception $e) {
+    
+                            }
+                            
+                        }
+                    }
+                }
+            }
+
+
 
             return $this->send(array('result' => 'success', 'message' => $this->lang->saveSuccess, 'locate' => $this->createLink($module, $method, $params)));
         }

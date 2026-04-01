@@ -1780,9 +1780,15 @@ class groupModel extends model
                 if(strpos(',' . $priv['vision'] . ',',  ',' . $this->config->vision . ',')  === false) continue;
 
                 if(!$this->checkNavSubset($nav, $packageData->subset)) continue;
-
                 /* If version is selected, only show privs before the version. */
                 if(!empty($version) and strpos($versionPrivs, ",$privCode,") === false) continue;
+
+                /* No solution has been found for temporary use. */
+                if($privCode == 'projectapproval-business')         $this->lang->resource->$moduleName->$methodName = 'businessList';
+                if($privCode == 'projectapproval-linkBusiness')     $this->lang->resource->$moduleName->$methodName = 'linkBusiness';
+                if($privCode == 'projectapproval-finishReport')     $this->lang->resource->$moduleName->$methodName = 'finishReport';
+                if($privCode == 'projectapproval-exportReportWord') $this->lang->resource->$moduleName->$methodName = 'exportReportWord';
+                if($privCode == 'projectapproval-exportReviewWord') $this->lang->resource->$moduleName->$methodName = 'exportReviewWord';
 
                 /* Add methods in workflow menus, remove privs unused in the edition. */
                 if(isset($this->lang->$moduleName->menus) && isset($this->lang->$moduleName->menus[$methodName]))

@@ -619,39 +619,39 @@ class commonModel extends model
             $icons = array('lite' => 'target', 'rnd' => 'remote', 'or'=> 'or', 'manager' => 'manager', 'ipd' => 'ipd');
 
             $currentIcon = zget($icons, $currentVision, 'target');
-            if(count($userVisions) < 2 || count($configVisions) < 2)
-            {
-                echo "<div id='visionSwitcher'>";
-                echo    "<a id='versionSwitchBtn' class='btn btn-link'>";
-                echo        "<i class='icon icon-$currentIcon'></i>";
-                echo        "<span class='text'>{$lang->visionList[$currentVision]}</span>";
-                echo    '</a>';
-                echo '</div>';
-                return;
-            }
+            //if(count($userVisions) < 2 || count($configVisions) < 2)
+            //{
+            //    echo "<div id='visionSwitcher'>";
+            //    echo    "<a id='versionSwitchBtn' class='btn btn-link'>";
+            //    echo        "<i class='icon icon-$currentIcon'></i>";
+            //    echo        "<span class='text'>{$lang->visionList[$currentVision]}</span>";
+            //    echo    '</a>';
+            //    echo '</div>';
+            //    return;
+            //}
 
-            echo "<div class='dropdown dropup' id='visionSwitcher'>";
-            echo    "<ul id='versionMenu' class='dropdown-menu'>";
-            echo        "<li class='dropdown-header'>{$lang->switchTo}</li>";
-            foreach($lang->visionList as $vision => $visionName)
-            {
-                if(!in_array($vision, $userVisions)) continue;
+            //echo "<div class='dropdown dropup' id='visionSwitcher'>";
+            //echo    "<ul id='versionMenu' class='dropdown-menu'>";
+            //echo        "<li class='dropdown-header'>{$lang->switchTo}</li>";
+            //foreach($lang->visionList as $vision => $visionName)
+            //{
+            //    if(!in_array($vision, $userVisions)) continue;
 
-                $icon   = zget($icons, $vision, 'target');
-                $active = $currentVision == $vision;
-                $text   = "<i class='icon item-icon icon-$icon'></i> " . $lang->visionList[$vision] . ($active ? " <i class='icon icon-check'></i>" : '');
+            //    $icon   = zget($icons, $vision, 'target');
+            //    $active = $currentVision == $vision;
+            //    $text   = "<i class='icon item-icon icon-$icon'></i> " . $lang->visionList[$vision] . ($active ? " <i class='icon icon-check'></i>" : '');
 
-                echo '<li' . ($active ? ' class="active"' : '') . '>';
-                echo html::a(helper::createLink('my', 'ajaxSwitchVision', "vision=$vision"), $text, '', "data-type='ajax'");
-                echo '</li>';
-            }
-            echo    '</ul>';
-            echo    "<a id='versionSwitchBtn' class='btn btn-link dropdown-toggle' data-toggle='dropdown'>";
-            echo        "<i class='icon icon-$currentIcon'></i>";
-            echo        " <span class='text'>{$lang->visionList[$currentVision]}</span>";
-            echo        " <span class='caret'></span>";
-            echo    '</a>';
-            echo '</div>';
+            //    echo '<li' . ($active ? ' class="active"' : '') . '>';
+            //    echo html::a(helper::createLink('my', 'ajaxSwitchVision', "vision=$vision"), $text, '', "data-type='ajax'");
+            //    echo '</li>';
+            //}
+            //echo    '</ul>';
+            //echo    "<a id='versionSwitchBtn' class='btn btn-link dropdown-toggle' data-toggle='dropdown'>";
+            //echo        "<i class='icon icon-$currentIcon'></i>";
+            //echo        " <span class='text'>{$lang->visionList[$currentVision]}</span>";
+            //echo        " <span class='caret'></span>";
+            //echo    '</a>';
+            //echo '</div>';
         }
     }
 
@@ -707,6 +707,7 @@ class commonModel extends model
 
             $hasPriv = common::hasPriv($module, $createMethod);
             if(!$hasPriv and $objectType == 'doc' and  common::hasPriv('api', 'create'))        $hasPriv = true;
+            if($objectType == 'forum') $hasPriv = true;
             if(!$hasPriv) continue;
 
             /* Determines whether to print a divider. */
@@ -795,7 +796,9 @@ class commonModel extends model
                     break;
             }
 
-            $html .= '<li>' . html::a(helper::createLink($module, $createMethod, $params, '', $isOnlyBody), "<i class='icon icon-$objectIcon'></i> " . $lang->createObjects[$objectType], '', "$attr data-app=''") . '</li>';
+            $createLinkLink = $objectType == 'forum' ? $lang->forumLink : helper::createLink($module, $createMethod, $params, '', $isOnlyBody);
+            $createLinkAttr = $objectType == 'forum' ? "target='_blank'" : "$attr data-app=''";
+            $html .= '<li>' . html::a($createLinkLink, "<i class='icon icon-$objectIcon'></i> " . $lang->createObjects[$objectType], '', $createLinkAttr) . '</li>';
         }
 
         if(!$showCreateList) return '';
@@ -2217,7 +2220,7 @@ EOF;
                     $diff = '';
                     if(substr_count((string)$value, "\n") > 1     or
                         substr_count((string)$old->$key, "\n") > 1 or
-                        strpos('name,title,desc,spec,steps,content,digest,verify,report,definition,analysis,summary,prevention,resolution,outline,schedule,minutes', strtolower($key)) !== false)
+                        strpos('name,title,desc,spec,steps,content,digest,verify,report,definition,analysis,summary,prevention,resolution,outline,schedule,minutes,businessdesc,businessobjective', strtolower($key)) !== false)
                     {
                         $diff = commonModel::diff($old->$key, $value);
                     }
@@ -2768,7 +2771,6 @@ EOF;
         {
             if(isset($rights[$module]['import']) and commonModel::hasDBPriv($object, $module, 'import')) return true;
         }
-
         if(isset($rights[$module][$method]))
         {
             if(!commonModel::hasDBPriv($object, $module, $method)) return false;

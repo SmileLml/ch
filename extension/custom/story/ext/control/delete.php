@@ -35,6 +35,8 @@ class myStory extends story
 
             $this->executeHooks($storyID);
 
+            $this->story->changeRequirementStatusByStoryStage(array($storyID));
+
             if(defined('RUN_MODE') && RUN_MODE == 'api') return $this->send(array('status' => 'success'));
 
             if((in_array($this->app->tab, array('execution', 'chteam'))) and $from == 'taskkanban')

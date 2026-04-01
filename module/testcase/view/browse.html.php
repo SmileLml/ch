@@ -32,6 +32,7 @@ js::set('differentProduct', $lang->testcase->differentProduct);
 js::set('langRowIndex',     $lang->testcase->rowIndex);
 js::set('langNestTotal',    $lang->testcase->nestTotal);
 js::set('langNormal',       $lang->testcase->normal);
+js::set('reloadUrl',        $this->createLink('testcase', 'browse', "productID={$productID}&branch={$branch}&browseType={$browseType}&param={$param}&caseType={$caseType}&orderBy={$orderBy}&recTotal={$pager->recTotal}&recPerPage={$pager->recPerPage}&pageID=1&projectID={$projectID}"));
 ?>
 <?php if($this->app->tab == 'project'):?>
 <style>
@@ -111,11 +112,12 @@ js::set('langNormal',       $lang->testcase->normal);
       $canBatchRun                = common::hasPriv('testtask', 'batchRun');
       $canBatchEdit               = common::hasPriv('testcase', 'batchEdit');
       $canBatchDelete             = common::hasPriv('testcase', 'batchDelete');
+      $canBatchClone              = common::hasPriv('testcase', 'batchClone');
       $canBatchCaseTypeChange     = common::hasPriv('testcase', 'batchCaseTypeChange');
       $canBatchConfirmStoryChange = common::hasPriv('testcase', 'batchConfirmStoryChange');
       $canBatchChangeModule       = common::hasPriv('testcase', 'batchChangeModule');
       $canImportToLib             = common::hasPriv('testcase', 'importToLib');
-      $canBatchAction             = ($canBatchRun || $canBatchEdit || $canBatchDelete || $canBatchCaseTypeChange || $canBatchConfirmStoryChange || $canBatchChangeModule || $canImportToLib);
+      $canBatchAction             = ($canBatchRun || $canBatchEdit || $canBatchDelete || $canBatchClone || $canBatchCaseTypeChange || $canBatchConfirmStoryChange || $canBatchChangeModule || $canImportToLib);
       ?>
       <?php if(!$useDatatable) echo '<div class="table-responsive">';?>
       <table class='table has-sort-head table-fixed table-nested table has-sort-head<?php if($useDatatable) echo ' datatable';?>' id='caseList' data-fixed-left-width='<?php echo $widths['leftWidth']?>' data-fixed-right-width='<?php echo $widths['rightWidth']?>' data-checkbox-name='caseIDList[]'>
@@ -177,6 +179,13 @@ js::set('langNormal',       $lang->testcase->normal);
                   $actionLink = $this->createLink('testcase', 'batchDelete', "productID=$productID");
                   $misc       = "onclick=\"confirmBatchDelete('$actionLink')\"";
                   echo "<li>" . html::a('#', $lang->delete, '', $misc) . "</li>";
+              }
+
+              if($canBatchClone)
+              {
+                  $actionLink = $this->createLink('testcase', 'batchClone');
+                  $misc       = $canBatchClone ? "onclick=\"setFormAction('$actionLink', '', '#caseList')\"" : "disabled='disabled'";
+                  echo "<li>" . html::a('#', $lang->testcase->clone, '', $misc) . "</li>";
               }
 
               if($canBatchCaseTypeChange)

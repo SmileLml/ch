@@ -17,6 +17,7 @@ class myStory extends story
         $storyIdList = array_unique($storyIdList);
         $allChanges  = $this->story->batchChangeStage($storyIdList, $stage);
         if(dao::isError()) return print(js::error(dao::getError()));
+        $this->story->changeRequirementStatusByStoryStage($storyIdList);
 
         $action = $stage == 'verified' ? 'Verified' : 'Edited';
         foreach($allChanges as $storyID => $changes)

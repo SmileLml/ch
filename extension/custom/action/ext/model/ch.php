@@ -165,7 +165,7 @@ public function getTrashesBySearch($objectType, $type, $queryID, $orderBy, $page
             ->andWhere('t1.extra')->eq($extra)
             ->andWhere('t1.vision')->eq($this->config->vision)
             ->beginIF($objectType != 'all')->andWhere('t1.objectType')->eq($objectType)->fi()
-            ->andWhere('t1.objectType')->ne('chproject')
+            ->andWhere('t1.objectType')->notin('chproject,requirement,story')
             ->orderBy($orderBy)
             ->page($pager)
             ->fetchAll('objectID');
@@ -191,6 +191,49 @@ public function getTrashesBySearch($objectType, $type, $queryID, $orderBy, $page
 }
 
 /**
+ * Log histories for an action.
+ *
+ * @param  int    $actionID
+ * @param  array  $changes
+ * @access public
+ * @return void
+ */
+public function logHistory($actionID, $changes)
+{
+    if(empty($actionID)) return false;
+    foreach($changes as $change)
+    {
+        if(is_object($change))
+        {
+            $change->action = $actionID;
+        }
+        else
+        {
+            $change['action'] = $actionID;
+        }
+
+        $this->dao->insert(TABLE_HISTORY)->data($change)->exec();
+
+        if(is_array($change)) $change = (object)$change;
+        if($change->field == 'status' || $change->field == 'stage')
+        {
+            $action = $this->getById($actionID);
+            if($action->objectType == 'story')
+            {
+                if($change->field == 'status') $this->loadModel('action')->create('story', $action->objectID, 'changestatus' . $change->new);
+                if($change->field == 'stage')  $this->loadModel('action')->create('story', $action->objectID, 'changestage' . $change->new);
+            }
+        }
+    }
+
+    if(isset($this->session->callbackActionList[$actionID]))
+    {
+        $callbackMethod = $this->session->callbackActionList[$actionID];
+        unset($this->session->callbackActionList[$actionID]);
+        if(method_exists($this, $callbackMethod)) call_user_func_array(array($this, $callbackMethod), array($actionID));
+    }
+}
+/**
      * Print changes of every action.
      *
      * @param  string    $objectType
@@ -202,9 +245,16 @@ public function getTrashesBySearch($objectType, $type, $queryID, $orderBy, $page
     public function printChanges($objectType, $histories, $canChangeTag = true)
     {
         $this->loadModel('workflowaction');
-        if($objectType == 'business' or $objectType == 'projectapproval') $fields = $this->workflowaction->getFields($objectType, 'view');
+
+        if($objectType == 'business' or $objectType == 'projectapproval')
+        {
+            $fields = $this->workflowaction->getFields($objectType, 'view');
+
+            if($objectType == 'business') $fields['project']->options = $this->loadModel('demand')->getBusinessProject(true);
+        }
+
         if(empty($histories)) return;
-       
+
         $maxLength            = 0;          // The max length of fields names.
         $historiesWithDiff    = array();    // To save histories without diff info.
         $historiesWithoutDiff = array();    // To save histories with diff info.
@@ -215,7 +265,7 @@ public function getTrashesBySearch($objectType, $type, $queryID, $orderBy, $page
             $history->fieldLabel = (isset($this->lang->$objectType) && isset($this->lang->$objectType->$fieldName)) ? $this->lang->$objectType->$fieldName : $fieldName;
             if($objectType == 'module') $history->fieldLabel = $this->lang->tree->$fieldName;
             if($fieldName == 'fileName') $history->fieldLabel = $this->lang->file->$fieldName;
-            
+
             if($objectType == 'business' or $objectType == 'projectapproval')
             {
                 if(in_array($fields[$history->field]->control, array('select', 'radio', 'multi-select')) && !empty($fields[$history->field]->options))
@@ -235,16 +285,33 @@ public function getTrashesBySearch($objectType, $type, $queryID, $orderBy, $page
                     else
                     {
                         $history->old = $fields[$history->field]->options[$history->old];
-                        $history->new = $fields[$history->field]->options[$history->new];
+
+                        if($history->field == 'reviewStatus' && $history->new == 'pass' && $objectType == 'projectapproval')
+                        {
+                            $statusHistory = $this->dao->select('new')->from(TABLE_HISTORY)->where('action')->eq($history->action)->andWhere('field')->eq('status')->fetch('new');
+                            if($statusHistory == 'toBeEvaluated') $history->new = $this->lang->action->projectapprovalStatusList['firstPass'];
+                            if($statusHistory != 'toBeEvaluated') $history->new = $this->lang->action->projectapprovalStatusList['approvedPass'];
+                        }
+                        else
+                        {
+                            $history->new = $fields[$history->field]->options[$history->new];
+                        }
+
                     }
                 }
             }
-        
+            if($objectType == 'story' && $history->field == 'status')
+            {
+                $this->loadModel('story');
+                $history->old = $this->lang->story->statusList[$history->old];
+                $history->new = $this->lang->story->statusList[$history->new];
+            }
+
             if(($length = strlen($history->fieldLabel)) > $maxLength) $maxLength = $length;
             $history->diff ? $historiesWithDiff[] = $history : $historiesWithoutDiff[] = $history;
         }
         $histories = array_merge($historiesWithoutDiff, $historiesWithDiff);
-       
+
         foreach($histories as $history)
         {
             $history->fieldLabel = str_pad($history->fieldLabel, $maxLength, $this->lang->action->label->space);

@@ -7,8 +7,8 @@ if(isset($config->environment) and ($config->environment == 'prod'))
     $config->apiRequest->ebsPwd          = 'ztpmsPassword1';
     $config->apiRequest->flashMessageUrl = 'http://f5-all.springlmapl.chinner.com:31740/';
 
-    $config->apiRequest->flashMessageAppkey    = '888888';
-    $config->apiRequest->flashMessageSecretKey = '88888888';
+    $config->apiRequest->flashMessageAppkey    = '9991900';
+    $config->apiRequest->flashMessageSecretKey = 'D7#pQ9@k';
 }
 else
 {
@@ -18,7 +18,7 @@ else
     $config->apiRequest->ebsPwd          = 'test';
     $config->apiRequest->flashMessageUrl = 'http://10.131.0.116:31740/';
 
-    $config->apiRequest->flashMessageAppkey    = '888888';
+    $config->apiRequest->flashMessageAppkey    = '19991900';
     $config->apiRequest->flashMessageSecretKey = '88888888';
 }
 

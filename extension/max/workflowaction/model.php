@@ -278,6 +278,9 @@ class workflowactionModel extends model
                 $fields[$key]->layoutRules  = $field->layoutRules;
                 $fields[$key]->options      = $field->options;
                 $fields[$key]->default      = $field->default;
+                $fields[$key]->colspan      = $field->colspan;
+                $fields[$key]->titleWidth   = $field->titleWidth;
+                $fields[$key]->titleColspan = $field->titleColspan;
 
                 if($key == 'actions') $fields[$key]->name = $this->lang->actions;
                 if($key == 'actions' && zget($action, 'method') == 'browse') $fields[$key]->show = 1;
@@ -491,7 +494,10 @@ class workflowactionModel extends model
             foreach($values as $field => $value) $values[$field] = array_unique(array_filter($value));
             $values = array_filter($values);
 
-            foreach($fields as $field) $field->options = $this->getRealOptions($field, zget($values, $field->field, ''), $importData);
+            foreach($fields as $field)
+            {
+                $field->options = $this->getRealOptions($field, zget($values, $field->field, ''), $importData);
+            }
         }
 
         return $fields;
@@ -1001,8 +1007,8 @@ class workflowactionModel extends model
 
     /**
      * Get position list.
-     * 
-     * @param  array    $blocks 
+     *
+     * @param  array    $blocks
      * @access public
      * @return array
      */
@@ -1065,5 +1071,114 @@ class workflowactionModel extends model
         if($methodName == 'setjs')  return commonModel::hasPriv('workflowaction', 'setJS')  && $isClickable && !in_array($action->method, $actionConfig->noJSActions);
         if($methodName == 'setcss') return commonModel::hasPriv('workflowaction', 'setCSS') && $isClickable && !in_array($action->method, $actionConfig->noCSSActions);
         if($methodName == 'delete') return commonModel::hasPriv('workflowaction', 'delete') && $action->role == 'custom';
+    }
+
+    /**
+     * Get fields of an action.
+     *
+     * @param  string $module
+     * @param  object $action
+     * @param  bool   $getRealOptions
+     * @param  array  $datas
+     * @access public
+     * @return array
+     */
+    public function getMigrationFields($module, $getRealOptions = true, $datas = array())
+    {
+        $actionFields = $this->dao->select("t1.*, t2.id, t2.name, t2.control, t2.expression, t2.options, t2.type, t2.length, t2.rules, t2.placeholder, t2.canExport, t2.canSearch, t2.isValue, t2.desc, t2.buildin, t2.default")
+            ->from(TABLE_WORKFLOWLAYOUT)->alias('t1')
+            ->leftJoin(TABLE_WORKFLOWFIELD)->alias('t2')->on('t1.module=t2.module AND t1.field=t2.field')
+            ->where('t1.module')->eq($module)
+            ->andWhere('t1.field')->in($this->config->user->migrateFields->$module)
+            ->beginIF(!empty($this->config->vision))->andWhere('t1.vision')->eq($this->config->vision)->fi()
+            ->orderBy('t1.order, t2.order, t2.id')
+            ->fetchAll('field');
+
+        $datas = $this->mergeDefaultDatas($actionFields, $datas);
+        $flow  = $this->loadModel('workflow', 'flow')->getByModule($module);
+
+        $subTables = $this->workflow->getPairs($module, $type = 'table');
+        $fieldList = $this->loadModel('workflowfield', 'flow')->getList($module);
+        $fieldList = $this->processFields($fieldList, $getRealOptions, $datas);
+
+        foreach($actionFields as $key => $field)
+        {
+            $field = $this->workflowfield->processFieldOptions($field);
+
+            if(!isset($fieldList[$field->field])) continue;
+
+            $field->options = $fieldList[$field->field]->options;
+        }
+
+        $fields = array();
+
+        foreach($actionFields as $key => $field)
+        {
+            if(!$field) continue;
+
+            if($field->layoutRules)
+            {
+                $rules = "{$field->rules},{$field->layoutRules}";
+                $rules = explode(',', $rules);
+
+                $field->rules = implode(',', array_unique($rules));
+            }
+
+            $fields[$key] = $this->getNewField();
+            $fields[$key]->id           = ($key == 'actions') ? $key : $field->id;
+            $fields[$key]->module       = $module;
+            $fields[$key]->field        = $field->field;
+            $fields[$key]->type         = $field->type;
+            $fields[$key]->length       = $field->length;
+            $fields[$key]->name         = zget($subTables, str_replace('sub_', '', $key), $field->name);    // 把前缀去掉来获得明细表名。
+            $fields[$key]->control      = $field->control;
+            $fields[$key]->expression   = $field->expression;
+            $fields[$key]->buildin      = $field->buildin;
+            $fields[$key]->canExport    = $field->canExport;
+            $fields[$key]->canSearch    = $field->canSearch;
+            $fields[$key]->isValue      = $field->isValue;
+            $fields[$key]->show         = '1';
+            $fields[$key]->width        = $field->width ? $field->width : 'auto';
+            $fields[$key]->position     = $field->position;
+            $fields[$key]->readonly     = $field->readonly;
+            $fields[$key]->mobileShow   = $field->mobileShow;
+            $fields[$key]->summary      = $field->summary;
+            $fields[$key]->defaultValue = $field->defaultValue;
+            $fields[$key]->rules        = $field->rules;
+            $fields[$key]->sql          = $field->sql;
+            $fields[$key]->layoutRules  = $field->layoutRules;
+            $fields[$key]->options      = $field->options;
+            $fields[$key]->default      = $field->default;
+            $fields[$key]->colspan      = $field->colspan;
+            $fields[$key]->titleWidth   = $field->titleWidth;
+            $fields[$key]->titleColspan = $field->titleColspan;
+
+            if($key == 'actions') $fields[$key]->name = $this->lang->actions;
+            if($key == 'actions' && zget($action, 'method') == 'browse') $fields[$key]->show = 1;
+        }
+
+        foreach($fieldList as $id => $field)
+        {
+            if(!$field or isset($actionFields[$field->field])) continue;
+            if(zget($flow, 'type') == 'table' && $field->field == 'mailto') continue;
+
+            $fields[$field->field] = $this->getNewField();
+            $fields[$field->field]->id         = $field->id;
+            $fields[$field->field]->module     = $module;
+            $fields[$field->field]->field      = $field->field;
+            $fields[$field->field]->type       = $field->type;
+            $fields[$field->field]->length     = $field->length;
+            $fields[$field->field]->name       = $field->name;
+            $fields[$field->field]->control    = $field->control;
+            $fields[$field->field]->expression = $field->expression;
+            $fields[$field->field]->buildin    = $field->buildin;
+            $fields[$field->field]->canExport  = $field->canExport;
+            $fields[$field->field]->canSearch  = $field->canSearch;
+            $fields[$field->field]->isValue    = $field->isValue;
+            $fields[$field->field]->options    = $field->options;
+            $fields[$field->field]->default    = $field->default;
+        }
+
+        return $fields;
     }
 }

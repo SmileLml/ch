@@ -35,6 +35,8 @@ class chteamModel extends model
      */
     public function getList($browseType = 'all', $queryID = 0, $orderBy = 'id_desc', $pager = null)
     {
+        $this->loadModel('user');
+        $this->loadModel('chproject');
         if($queryID)
         {
             $query = $this->loadModel('search')->getQuery($queryID);
@@ -53,10 +55,15 @@ class chteamModel extends model
             if($browseType == 'bySearch' and $this->session->chteamQuery == false) $this->session->set('chteamQuery', ' 1 = 1');
         }
 
+        $currentUser           = $this->app->user->account;
+        $PMOUsers              = $this->user->getUsersByUserGroupName($this->lang->chproject->group->PMO);
+        $QAUsers               = $this->user->getUsersByUserGroupName($this->lang->chproject->group->QA);
+        $seniorExecutiveUsers  = $this->user->getUsersByUserGroupName($this->lang->chproject->group->seniorExecutive);
+
         return $this->dao->select('*')->from(TABLE_CHTEAM)
             ->where('deleted')->eq('0')
             ->beginIF($browseType == 'bysearch' and $this->session->chteamQuery)->andWhere($this->session->chteamQuery)->fi()
-            ->beginIF($browseType == 'myInvolved' && (!$this->app->user->admin))->andWhere("FIND_IN_SET('{$this->app->user->account}', members)")->fi()
+            ->beginIF($browseType == 'myInvolved' && (!$this->app->user->admin && !isset($seniorExecutiveUsers[$currentUser]) && !isset($PMOUsers[$currentUser]) && !isset($QAUsers[$currentUser])))->andWhere("FIND_IN_SET('{$this->app->user->account}', members)")->fi()
             ->orderBy($orderBy)
             ->page($pager)
             ->fetchAll();
@@ -200,12 +207,19 @@ class chteamModel extends model
     public function setMenu($objectID)
     {
         global $lang;
+        $this->loadModel('user');
+        $this->loadModel('chproject');
 
         $model = 'scrum';
 
+        $currentUser           = $this->app->user->account;
+        $PMOUsers              = $this->user->getUsersByUserGroupName($this->lang->chproject->group->PMO);
+        $QAUsers               = $this->user->getUsersByUserGroupName($this->lang->chproject->group->QA);
+        $seniorExecutiveUsers  = $this->user->getUsersByUserGroupName($this->lang->chproject->group->seniorExecutive);
+
         $chteam = $this->dao->select('id')->from(TABLE_CHTEAM)
             ->where('deleted')->eq(0)
-            ->beginIF(!$this->app->user->admin)->andWhere("FIND_IN_SET('{$this->app->user->account}', members)")->fi()
+            ->beginIF(!$this->app->user->admin && !isset($seniorExecutiveUsers[$currentUser]) && !isset($PMOUsers[$currentUser]) && !isset($QAUsers[$currentUser]))->andWhere("FIND_IN_SET('{$this->app->user->account}', members)")->fi()
             ->fetch('id');
 
         $objectID = empty($objectID) ? $chteam : $objectID;

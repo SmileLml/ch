@@ -361,7 +361,10 @@ class block extends control
      */
     public function dynamic()
     {
-        $this->view->actions = $this->loadModel('action')->getDynamic('all', 'today', 'id_desc', 30);
+        if(!$this->app->user->admin) $account = $this->app->user->account;
+        if($this->app->user->admin)  $account = 'all';
+
+        $this->view->actions = $this->loadModel('action')->getDynamic($account, 'today', 'id_desc', 30);
         $this->view->users   = $this->loadModel('user')->getPairs('nodeleted|noletter|all', '', 0, array_unique(helper::arrayColumn($this->view->actions, 'actor')));
 
         $this->display();

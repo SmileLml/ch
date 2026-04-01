@@ -24,6 +24,7 @@ class myChproject extends chproject
         $this->loadModel('tree');
         $this->loadModel('product');
         $this->loadModel('execution');
+        $this->session->set('caseList', $this->app->getURI(true), $this->app->tab);
 
         $this->chproject->setMenu($projectID);
 
@@ -59,6 +60,21 @@ class myChproject extends chproject
         $linkParams = ['chproject' => $projectID, 'intanceProjectID' => $intanceProjectID, 'productID' => $productID, 'orderBy' => $orderBy, 'type' => $type, 'branch' => $branchID];
         $moduleTree = $this->tree->getTeamTreeMenu('case', $projectID, 0, $linkParams);
 
+        $intanceProjects  = $this->chproject->getIntancesProjectOptions($projectID, 'projectID', 'projectName');
+        $linkProject = $this->chproject->getCaseExecutionProject($intances);
+        foreach($cases as $case)
+        {
+            $linkExecutions = $this->chproject->getCaseExecution($case, $intances);
+
+            $linkProjectName = '';
+            foreach($linkExecutions as $linkExecution)
+            {
+                if(isset($intanceProjects[$linkProject[$linkExecution]])) $linkProjectName .= $intanceProjects[$linkProject[$linkExecution]] . ',';
+            }
+
+            $case->linkProjectName = trim($linkProjectName, ',');
+        }
+
         $this->view->title            = $project->name . $this->lang->colon . $this->lang->execution->testcase;
         $this->view->productID        = $productID;
         $this->view->cases            = $cases;
@@ -75,7 +91,7 @@ class myChproject extends chproject
         $this->view->projectPairs     = $this->loadModel('project')->getPairsByProgram();
         $this->view->products         = $this->product->getPairs();
         $this->view->projectID        = $projectID;
-        $this->view->intanceProjects  = $this->chproject->getIntancesProjectOptions($projectID, 'projectID', 'projectName');
+        $this->view->intanceProjects  = $intanceProjects;
         $this->view->intanceProjectID = $intanceProjectID;
         $this->view->defaultProduct   = (empty($productID) and !empty($products)) ? current(array_keys($products)) : $productID;
 

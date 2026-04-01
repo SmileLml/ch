@@ -1,0 +1,7 @@
+.table-children {border-left: 2px solid #cbd0db; border-right: 2px solid #cbd0db;}
+.table-nest-icon {margin-right: 3px;}
+.table-nest-toggle:before {line-height: 22px; content: "\e6f2";}
+.table-nest-child-hide.table-nest-toggle:before {line-height: 22px; content: "\e6f1";}
+.main-table tbody>tr>td.child {padding-left: 40px;}
+.btn-group a.btn-secondary, .btn-group a.btn-primary {border-right: 1px solid rgba(255,255,255,0.2);}
+body {margin-bottom: 25px;}
