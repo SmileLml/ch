@@ -98,6 +98,7 @@ js::set('showFeatures',  $showFeatures);
       <?php else:?>
       <?php $version     = $config->version;?>
       <?php $versionName = ($config->inQuickon ? 'DevOps' : '') . $lang->pmsName . $config->version;?>
+      <a href='javascript:void(0)' id='bizLink' class='btn btn-link' style='color: #B57D4F;'><span class='upgrade'><?php echo $lang->bizName;?></span> <i class='text-danger icon-pro-version'></i></a>
       <?php endif;?>
       <a href='<?php echo $lang->website;?>' class="btn btn-sm btn-link" target='_blank' title='<?php echo $version;?>'>
         <i class="icon icon-zentao" style="font-size: 24px;"></i>
@@ -125,33 +126,6 @@ js::set('showFeatures',  $showFeatures);
         </h2>
       </div>
       <div id="latestVersionList">
-        <?php if(empty($latestVersionList)):?>
-        <div class="table-empty-tip">
-          <a href='<?php echo $lang->website;?>' target='_blank'>
-            <span class="label label-badge label-info label-outline"><?php echo $lang->index->website . ': '. $lang->website;?></span>
-          </a>
-        </div>
-        <?php else:?>
-        <div class='version-content'>
-          <?php $lastVersion = end($latestVersionList);?>
-          <?php foreach($latestVersionList as $versionNumber => $version):?>
-          <div class="version-list">
-            <div>
-              <i class='version-upgrade icon-version'></i>
-              <h4><?php echo $version['name'];?></h4>
-            </div>
-            <div class="version-detail"><?php echo $version['explain'];?></div>
-            <div class="version-footer">
-              <a href="<?php echo inLink('changeLog', 'version=' . $versionNumber);?>" class="btn btn-link iframe" data-width="800"><?php echo $lang->index->log;?></strong></a>
-              <a href='<?php echo $version['link']?>' class='btn btn-primary upgrade-now' style='color: white;' target='_blank'><?php echo $lang->index->upgradeNow;?></a>
-            </div>
-          </div>
-          <?php if($version['name'] != $lastVersion['name']):?>
-          <hr class='version-hr'>
-          <?php endif;?>
-          <?php endforeach;?>
-        </div>
-        <?php endif;?>
       </div>
     </div>
   </div>

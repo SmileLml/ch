@@ -2,3 +2,5 @@ vscode/
 tmp/
 www/data/upload/
 test/
+module/index/view/index.html.php
+config/ext/demand.php
