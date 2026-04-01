@@ -155,11 +155,11 @@ class ganttExecution extends executionModel
     public function getDataForGantt($executionID, $type, $orderBy)
     {
         $this->app->loadLang('task');
-        $relations  = $this->dao->select('*')->from(TABLE_RELATIONOFTASKS)->where('execution')->eq($executionID)->fetchGroup('task', 'pretask');
+        $relations  = $this->dao->select('*')->from(TABLE_RELATIONOFTASKS)->where('execution')->in($executionID)->fetchGroup('task', 'pretask');
         $taskGroups = $this->dao->select('t1.*, t2.realname,t3.branch')->from(TABLE_TASK)->alias('t1')
             ->leftJoin(TABLE_USER)->alias('t2')->on('t1.assignedTo = t2.account')
             ->leftJoin(TABLE_STORY)->alias('t3')->on('t1.story = t3.id')
-            ->where('t1.execution')->eq($executionID)
+            ->where('t1.execution')->in($executionID)
             ->andWhere('t1.deleted')->eq(0)
             ->andWhere('t1.status')->ne('cancel')
             ->orderBy("{$type}_asc,id_asc")
@@ -172,7 +172,7 @@ class ganttExecution extends executionModel
         {
             foreach($productBranch as $branchID => $branchName) $branches[$branchID] = $branchName;
         }
-
+        if($this->app->tab == 'chteam') $executionID = reset($executionID);
         $execution = $this->dao->select('*')->from(TABLE_EXECUTION)->where('id')->eq($executionID)->fetch();
         if($type == 'story') $stories = $this->dao->select('*')->from(TABLE_STORYSPEC)->where('story')->in(array_keys($taskGroups))->fetchGroup('story', 'version');
         if($type == 'module')
@@ -433,6 +433,11 @@ class ganttExecution extends executionModel
             $data->delayDays = helper::diffDate(($task->status == 'done' || $task->status == 'closed') ? substr($task->finishedDate, 0, 10) : $today, substr($end, 0, 10));
         }
 
+        if($this->app->tab == 'chteam')
+        {
+            $projectPairs  = $this->loadModel('project')->getPairsByProgram();
+            $data->project = zget($projectPairs, $task->project, '');
+        }
 
 
         return $data;

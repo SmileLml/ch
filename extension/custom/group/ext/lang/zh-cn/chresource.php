@@ -1,0 +1,29 @@
+<?php
+$lang->group->chproject = '迭代列表';
+$lang->group->package->browseChproject = '浏览团队迭代';
+$lang->group->package->manageChproject = '创建维护团队迭代';
+$lang->group->package->deleteChproject = '删除团队迭代';
+$lang->group->package->taskChproject   = '团队迭代任务';
+$lang->group->package->storyChproject  = '团队迭代需求';
+$lang->group->package->burnChproject   = '燃尽图';
+
+$lang->resource->chproject = new stdclass();
+$lang->resource->chproject->browse     = 'browse';
+$lang->resource->chproject->create     = 'create';
+$lang->resource->chproject->edit       = 'edit';
+$lang->resource->chproject->delete     = 'delete';
+$lang->resource->chproject->task       = 'task';
+$lang->resource->chproject->story      = 'story';
+$lang->resource->chproject->burn       = 'burn';
+$lang->resource->chproject->close      = 'close';
+$lang->resource->chproject->activate   = 'activate';
+$lang->resource->chproject->bug        = 'bug';
+$lang->resource->chproject->testcase   = 'testcase';
+$lang->resource->chproject->testtask   = 'testtask';
+$lang->resource->chproject->testreport = 'testreport';
+$lang->resource->chproject->kanban     = 'kanban';
+$lang->resource->chproject->cfd        = 'cfd';
+$lang->resource->chproject->gantt      = 'gantt';
+$lang->resource->chproject->grouptask  = 'grouptask';
+$lang->resource->chproject->tree       = 'tree';
+$lang->resource->chproject->taskeffort = 'taskeffort';

@@ -23,6 +23,12 @@ class flowProduct extends productModel
             }
         }
 
+        if($module == 'chproject' && in_array($method, array('bug', 'testcase')))
+        {
+            $params = explode(',', $extra);
+            return helper::createLink($module, $method, "projectID={$this->session->chproject}&intanceProjectID={$this->session->intanceProjectID}&productID=%s" . ($branch ? "&branch=%s" : ''));
+        }
+
         return $link;
     }
 }

@@ -758,6 +758,7 @@ class actionModel extends model
         $trashes = $this->dao->select('*')->from(TABLE_ACTION)
             ->where('action')->eq('deleted')
             ->beginIF($objectType != 'all')->andWhere('objectType')->eq($objectType)->fi()
+            ->andWhere('objectType')->ne('chproject')
             ->andWhere('extra')->eq($extra)
             ->andWhere('vision')->eq($this->config->vision)
             ->orderBy($orderBy)->page($pager)->fetchAll();

@@ -332,7 +332,10 @@ public function buildOperateBrowseMenu($task, $execution = '')
     }
 
     $menu .= $this->buildMenu('task', 'recordEstimate', $params, $task, 'browse', 'time', '', "iframe $disabled", true, $disabled ? 'disabled data-toggle=""' : '', $taskRecordTip);
-    $menu .= $this->buildMenu('task', 'edit',           $params, $task, 'browse', 'edit', '', '', false);
+
+    $dataApp = $this->app->tab == 'chteam' ? "data-app='chteam'" : '';
+    $menu   .= $this->buildMenu('task', 'edit', $params, $task, 'browse', 'edit', '', '', false, "$dataApp");
+
     if($this->config->vision != 'lite')
     {
         $menu .= $this->buildMenu('task', 'batchCreate', "execution=$task->execution&storyID=$task->story&moduleID=$task->module&taskID=$task->id&ifame=0", $task, 'browse', 'split', '', '', '', '', $this->lang->task->children);

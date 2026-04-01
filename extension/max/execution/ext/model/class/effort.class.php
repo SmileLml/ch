@@ -85,7 +85,7 @@ class effortExecution extends executionModel
     public function getTaskEffort($executionID)
     {
         $burns = $this->dao->select('`task`, `date`, `left`, `consumed`')->from(TABLE_BURN)
-            ->where('execution')->eq($executionID)
+            ->where('execution')->in($executionID)
             ->andWhere('`task`')->gt(0)
             ->fetchGroup('task', 'date');
         $tasks = $this->loadModel('task')->getExecutionTasks($executionID, 0, 'all', 0, 'story_desc');

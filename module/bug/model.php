@@ -81,6 +81,14 @@ class bugModel extends model
             ->remove('files,labels,uid,oldTaskID,contactListMenu,region,lane,ticket,deleteFiles,resultFiles')
             ->get();
 
+        if(empty($bug->product))
+        {
+            $name = $bug->execution ? $this->lang->execution->common : $this->lang->projectCommon;
+
+            dao::$errors['message'][] = $name . $this->lang->bug->relatedProducts;
+            return false;
+        }
+
         /* Check repeat bug. */
         $result = $this->loadModel('common')->removeDuplicate('bug', $bug, "product={$bug->product}");
         if($result and $result['stop']) return array('status' => 'exists', 'id' => $result['duplicate']);

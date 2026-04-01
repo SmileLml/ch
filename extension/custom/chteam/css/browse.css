@@ -1,0 +1,7 @@
+#chteamForm table tbody tr td {overflow: hidden; white-space: nowrap;}
+.table td.content div {height: 25px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; float: left; max-width: calc(100% - 20px);}
+.table td.content .more {position: absolute; right: 16px;}
+.table td.content .more .icon {color: #838a9d;}
+
+.table td.content .more .icon {font-size: 16px; display: inline-block; transition: transform .2s; -ms-transform: rotate(-90deg); -moz-transform: rotate(-90deg); -o-transform: rotate(-90deg); -webkit-transform: rotate(-90deg); transform: rotate(-90deg);}
+.table td.content .more .icon.rotate-down {-ms-transform: rotate(90deg); -moz-transform: rotate(90deg); -o-transform: rotate(90deg); -webkit-transform: rotate(90deg); transform: rotate(90deg);}

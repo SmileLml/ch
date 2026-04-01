@@ -1264,7 +1264,22 @@ class taskModel extends model
             }
             if($task->status == 'done')   $this->loadModel('score')->create('task', 'finish', $taskID);
             if($task->status == 'closed') $this->loadModel('score')->create('task', 'close', $taskID);
-            if($task->status != $oldTask->status) $this->loadModel('kanban')->updateLane($task->execution, 'task', $taskID);
+
+            if($this->app->tab == 'chteam' && ($task->execution != $oldTask->execution))
+            {
+                $cell = $this->dao->select('id,cards')->from(TABLE_KANBANCELL)
+                    ->where('kanban')->eq($oldTask->execution)
+                    ->andWhere('type')->eq('task')
+                    ->andWhere('cards')->like("%$taskID%")
+                    ->fetch();
+
+                $cards = str_replace(",$taskID,", ',', $cell->cards);
+
+                $this->dao->update(TABLE_KANBANCELL)->set('cards')->eq($cards)->where('id')->eq($cell->id)->exec();
+            }
+
+            if($task->status != $oldTask->status || $task->execution != $oldTask->execution) $this->loadModel('kanban')->updateLane($task->execution, 'task', $taskID);
+
             $this->loadModel('action');
             $changed = $task->parent != $oldTask->parent;
             if($oldTask->parent > 0)
@@ -1824,9 +1839,8 @@ class taskModel extends model
             $finishedUsers = $this->getFinishedUsers($oldTask->id, array_keys($oldTask->members));
             if(count($finishedUsers) == count($oldTask->team))
             {
-                $task->status       = 'done';
-                $task->finishedBy   = $this->app->user->account;
-                $task->finishedDate = $task->finishedDate;
+                $task->status     = 'done';
+                $task->finishedBy = $this->app->user->account;
             }
         }
 

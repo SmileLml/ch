@@ -76,6 +76,9 @@ class myfile extends file
         $this->fields['id']         = $taskLang->id;
         $this->fields['pri']        = $taskLang->pri;
         $this->fields['name']       = $taskLang->name;
+
+        if($this->app->tab == 'chteam') $this->fields['project'] = $taskLang->project;
+
         $this->fields['status']     = $taskLang->status;
         $this->fields['assignedTo'] = $taskLang->assignedTo;
         $this->fields['finishedBy'] = $taskLang->finishedBy;

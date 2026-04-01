@@ -76,6 +76,7 @@ $(function()
                     else $row = createRow();
                 }
                 $row.find('.title-import').val(line).addClass('highlight');
+                $row.find('.title-import').keydown();
                 $lastRow = $row;
                 if(!$firstRow) $firstRow = $row;
             });
