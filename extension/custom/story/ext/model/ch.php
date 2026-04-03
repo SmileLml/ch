@@ -2066,7 +2066,7 @@ public function buildOperateMenu($story, $type = 'view', $execution = '', $story
  * @access private
  * @return string
  */
-private function buildExecutionOperateMenu($story, $execution, $storyType = 'story', $params)
+private function buildExecutionOperateMenu($story, $execution, $storyType = 'story', $params = '')
 {
     $menu = '';
 
@@ -2208,7 +2208,7 @@ private function buildExecutionOperateMenu($story, $execution, $storyType = 'sto
  * @access private
  * @return string
  */
-private function buildBrowseOperateMenu($story, $type = 'view', $execution = '', $storyType = 'story', $params)
+private function buildBrowseOperateMenu($story, $type = 'view', $execution = '', $storyType = 'story', $params = '')
 {
     static $taskGroups = array();
 
@@ -2364,7 +2364,7 @@ private function buildBrowseOperateMenu($story, $type = 'view', $execution = '',
  * @access private
  * @return string
  */
-private function buildViewOperateMenu($story, $type = 'view', $execution = '', $storyType = 'story', $params)
+private function buildViewOperateMenu($story, $type = 'view', $execution = '', $storyType = 'story', $params = '')
 {
     static $taskGroups = array();
 
