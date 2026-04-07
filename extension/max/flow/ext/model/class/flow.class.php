@@ -794,8 +794,8 @@ EOT;
             if(in_array($action->module, array('business', 'projectapproval')) && $action->action == 'view') continue;
             if($action->module == 'business' && ($action->action == 'projectchange' || $action->action == 'prdsubmit'|| $action->action == 'prdcancel')) continue;
 
-            $tempBusiness = !empty($data->id) ? $this->dao->select('*')->from('zt_flow_business')->where('id')->eq($data->id)->fetch() : null;
-            if($action->module == 'business' && ($action->action == 'prdreview' || $action->action == 'close') && !empty($tempBusiness->project))
+            $tempBusiness = $this->dao->select('*')->from('zt_flow_business')->where('id')->eq($data->id)->fetch();
+            if($action->module == 'business' && ($action->action == 'prdreview' || $action->action == 'close') && $tempBusiness->project)
             {
                 $tempProjectapproval = $this->dao->select('*')->from('zt_flow_projectapproval')->where('id')->eq($tempBusiness->project)->fetch();
                 $tempProjectDept     = $this->loadModel('dept')->getAllChildId($tempProjectapproval->responsibleDept);
@@ -998,7 +998,7 @@ EOT;
                 $viewAction = $this->loadModel('workflowaction')->getByModuleAndAction($moduleName, 'view');
                 $class      = $action->open == 'modal' ? "iframe" : '';
                 $class     .= ($type == 'view' && $viewAction->open == 'modal') ? "loadInModal iframe" : '';
-                $dataWidth  = ($action->module == 'projectapproval' && $action->open == 'modal') ? "data-width='90%'" : '';
+                $dataWidth .= ($action->module == 'projectapproval' && $action->open == 'modal') ? "data-width='90%'" : '';
                 if($action->module == 'projectapproval' && $action->open == 'modal' && $action->action == 'uploadfiles') $dataWidth = str_replace("data-width='90%'", "data-width='50%'", $dataWidth);
                 $onlyBody   = ($type != 'menu' && $action->open == 'modal') ? true : false;
                 $deleter    = $action->method == 'delete' ? 'deleter' : '';
@@ -1113,9 +1113,10 @@ EOT;
 
         if(!$orderBy) $orderBy = 'id_desc';
 
-        $productRelatedModules    = ",productplan,release,story,build,bug,testcase,testtask,testsuite,feedback,";
-        $projectapprovalBrowseSql = $flow->module == 'projectapproval' ? $this->loadModel('flow')->getProjectapprovalBrowseSql() : ' 1=1';
-        $businessBrowseSql        = ' 1=1';
+        $productRelatedModules = ",productplan,release,story,build,bug,testcase,testtask,testsuite,feedback,";
+
+        if($flow->module == 'projectapproval') $projectapprovalBrowseSql = $this->loadModel('flow')->getProjectapprovalBrowseSql();
+
         if($flow->module == 'business')
         {
             $businessBrowseSql = $this->loadModel('flow')->getBusinessBrowseSql();

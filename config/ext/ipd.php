@@ -1,8 +1,6 @@
 <?php
 $config->ipdVersion = '1.4';
 
-define('TABLE_DEMANDPOOL',     '`' . $config->db->prefix . 'demandpool`');
-define('TABLE_DEMAND',         '`' . $config->db->prefix . 'demand`');
 define('TABLE_DEMANDSPEC',     '`' . $config->db->prefix . 'demandspec`');
 define('TABLE_DEMANDREVIEW',   '`' . $config->db->prefix . 'demandreview`');
 define('TABLE_ROADMAP',        '`' . $config->db->prefix . 'roadmap`');

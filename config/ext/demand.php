@@ -1,4 +1,6 @@
 <?php
+define('TABLE_DEMANDPOOL', '`' . $config->db->prefix . 'demandpool`');
+define('TABLE_DEMAND', '`' . $config->db->prefix . 'demand`');
 
 define('SX_ENABLE',false); //闪信开关
 
